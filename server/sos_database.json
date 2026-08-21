@@ -1,0 +1,1672 @@
+[
+  {
+    "messageId": "SOS-1B04ED",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318209543,
+    "receivedAt": 1787318209774,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-54352C",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318209360,
+    "receivedAt": 1787318209733,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-4BA061",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318208278,
+    "receivedAt": 1787318208488,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-734A9A",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318207230,
+    "receivedAt": 1787318207348,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-DA5006",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318206231,
+    "receivedAt": 1787318206397,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-F09548",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787318201288,
+    "receivedAt": 1787318201403,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 62,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-93DC1B",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787318198768,
+    "receivedAt": 1787318199127,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 17,
+    "ttl": 4,
+    "hopCount": 1,
+    "relayPath": [
+      "XIAOMI-22041219PI",
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-506077",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787318118924,
+    "receivedAt": 1787318119365,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 17,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-2062A4",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787318031380,
+    "receivedAt": 1787318031940,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 18,
+    "ttl": 4,
+    "hopCount": 1,
+    "relayPath": [
+      "XIAOMI-22041219PI",
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-4219CC",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787318021989,
+    "receivedAt": 1787318022578,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 18,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S938B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-F7CE12",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317936447,
+    "receivedAt": 1787317936897,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 18,
+    "ttl": 4,
+    "hopCount": 1,
+    "relayPath": [
+      "XIAOMI-22041219PI",
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-CB6B99",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317924557,
+    "receivedAt": 1787317925103,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 18,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI",
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-E4DB36",
+    "senderId": "SAMSUNG-SM-S938B",
+    "timestamp": 1787317916790,
+    "receivedAt": 1787317916976,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 63,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-C0BA65",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317867376,
+    "receivedAt": 1787317867952,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 18,
+    "ttl": 4,
+    "hopCount": 1,
+    "relayPath": [
+      "XIAOMI-22041219PI",
+      "SAMSUNG-SM-S938B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-5B4473",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317481658,
+    "receivedAt": 1787317482172,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-8C7F8E",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317481082,
+    "receivedAt": 1787317481435,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-7287DA",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317477032,
+    "receivedAt": 1787317477387,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "RESOLVED"
+  },
+  {
+    "messageId": "SOS-825FD1",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317467146,
+    "receivedAt": 1787317467267,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-C38262",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466961,
+    "receivedAt": 1787317467064,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-03451A",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466770,
+    "receivedAt": 1787317466869,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-F777C2",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466595,
+    "receivedAt": 1787317466698,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-1C88CB",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466419,
+    "receivedAt": 1787317466519,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-BD18D3",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466236,
+    "receivedAt": 1787317466333,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-8800EE",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317466068,
+    "receivedAt": 1787317466171,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-CF68AB",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317465885,
+    "receivedAt": 1787317465985,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-2271D3",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317465710,
+    "receivedAt": 1787317465819,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-79FF4B",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317465544,
+    "receivedAt": 1787317465644,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-EF7A97",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317465404,
+    "receivedAt": 1787317465519,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-87D6BB",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317457264,
+    "receivedAt": 1787317457354,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-3CF55C",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317457131,
+    "receivedAt": 1787317457235,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-9F56D7",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456964,
+    "receivedAt": 1787317457057,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-FC6956",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456805,
+    "receivedAt": 1787317456919,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-99EA54",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456655,
+    "receivedAt": 1787317456745,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-0F3AEC",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456513,
+    "receivedAt": 1787317456613,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-943906",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456355,
+    "receivedAt": 1787317456445,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-7D0794",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456205,
+    "receivedAt": 1787317456309,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-7E6CE6",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317456063,
+    "receivedAt": 1787317456160,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-1A92A5",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455921,
+    "receivedAt": 1787317456016,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-2A4D41",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455771,
+    "receivedAt": 1787317455862,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-5422B3",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455619,
+    "receivedAt": 1787317455728,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-FFE2E9",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455462,
+    "receivedAt": 1787317455550,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-35F860",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455303,
+    "receivedAt": 1787317455394,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-050CC9",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317455136,
+    "receivedAt": 1787317455224,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-EDC328",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317454979,
+    "receivedAt": 1787317455080,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-4D1C3A",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317454826,
+    "receivedAt": 1787317454924,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-5E6140",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317449097,
+    "receivedAt": 1787317449510,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-99B4F4",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448935,
+    "receivedAt": 1787317449292,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-349D6C",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448797,
+    "receivedAt": 1787317449132,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-0CCF0D",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448643,
+    "receivedAt": 1787317448952,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-ACFE50",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448481,
+    "receivedAt": 1787317448871,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-11746B",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448327,
+    "receivedAt": 1787317448820,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-E31E4B",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448196,
+    "receivedAt": 1787317448624,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-A77A32",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317448039,
+    "receivedAt": 1787317448543,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-593787",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447884,
+    "receivedAt": 1787317448239,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-587DC2",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447727,
+    "receivedAt": 1787317448121,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-974654",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447568,
+    "receivedAt": 1787317448110,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-2B1329",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447407,
+    "receivedAt": 1787317447943,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-F45A1F",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447256,
+    "receivedAt": 1787317447646,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-E86D9A",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317447090,
+    "receivedAt": 1787317447445,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-FD2AD8",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317446909,
+    "receivedAt": 1787317447314,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-6AB610",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317446494,
+    "receivedAt": 1787317446600,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-677225",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317446327,
+    "receivedAt": 1787317446429,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-4A3E4B",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317446169,
+    "receivedAt": 1787317446271,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-27E52B",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317445312,
+    "receivedAt": 1787317445683,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-489CBA",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317444866,
+    "receivedAt": 1787317444972,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-BA104B",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317443905,
+    "receivedAt": 1787317444265,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-881043",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317442293,
+    "receivedAt": 1787317442653,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-BBC173",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317440913,
+    "receivedAt": 1787317441021,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-DE185F",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317383330,
+    "receivedAt": 1787317383683,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-674B71",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317376958,
+    "receivedAt": 1787317377061,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-11DF39",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317371435,
+    "receivedAt": 1787317371849,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-7E7D07",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317355554,
+    "receivedAt": 1787317355994,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-998144",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317352588,
+    "receivedAt": 1787317352694,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-44BBA4",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317351643,
+    "receivedAt": 1787317352026,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-3F580F",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317350936,
+    "receivedAt": 1787317351026,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-C1F0C1",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317349736,
+    "receivedAt": 1787317350168,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-4772BC",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317348811,
+    "receivedAt": 1787317348914,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-0D67ED",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317347625,
+    "receivedAt": 1787317348010,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-7CBC43",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317345474,
+    "receivedAt": 1787317345584,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-9A905D",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787317343058,
+    "receivedAt": 1787317343409,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-005753",
+    "senderId": "SAMSUNG-SM-S936B",
+    "timestamp": 1787317335609,
+    "receivedAt": 1787317335731,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 42,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "SAMSUNG-SM-S936B"
+    ],
+    "gatewayId": "SAMSUNG-SM-S936B",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-BF50EB",
+    "senderId": "XIAOMI-22041219PI",
+    "timestamp": 1787316750704,
+    "receivedAt": 1787316751179,
+    "latitude": 26.9124,
+    "longitude": 75.7873,
+    "severity": "CRITICAL",
+    "batteryLevel": 21,
+    "ttl": 5,
+    "hopCount": 0,
+    "relayPath": [
+      "XIAOMI-22041219PI"
+    ],
+    "gatewayId": "XIAOMI-22041219PI",
+    "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-B7RMC8",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787315540620,
+    "latitude": 26.923516892440986,
+    "longitude": 75.81078042867686,
+    "severity": "CRITICAL",
+    "batteryLevel": 30,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Hillside Trek Route km 12 (Simulated Test Alert)",
+    "receivedAt": 1787315540620,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-OT97N7",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787315532870,
+    "latitude": 26.908233698001837,
+    "longitude": 75.78569845770107,
+    "severity": "CRITICAL",
+    "batteryLevel": 24,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Sector 4, Central Flood Zone (Simulated Test Alert)",
+    "receivedAt": 1787315532870,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-3T9PIW",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787315522319,
+    "latitude": 26.91767473682199,
+    "longitude": 75.80767814053185,
+    "severity": "CRITICAL",
+    "batteryLevel": 19,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Hillside Trek Route km 12 (Simulated Test Alert)",
+    "receivedAt": 1787315522319,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-HF3Y1O",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787314712617,
+    "latitude": 26.88520266236475,
+    "longitude": 75.7600049102251,
+    "severity": "CRITICAL",
+    "batteryLevel": 40,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Coastal Bridge Settlement (Simulated Test Alert)",
+    "receivedAt": 1787314712617,
+    "status": "RESOLVED"
+  },
+  {
+    "messageId": "SOS-KKP6V9",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787312737402,
+    "latitude": 26.910996201922515,
+    "longitude": 75.78323169313634,
+    "severity": "CRITICAL",
+    "batteryLevel": 27,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Sector 4, Central Flood Zone (Simulated Test Alert)",
+    "receivedAt": 1787312737402,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-9NVZ3B",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787312543793,
+    "latitude": 26.915940098431907,
+    "longitude": 75.78794537531962,
+    "severity": "CRITICAL",
+    "batteryLevel": 24,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Sector 4, Central Flood Zone (Simulated Test Alert)",
+    "receivedAt": 1787312543793,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-RJKZGZ",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787312533512,
+    "latitude": 26.920608404625206,
+    "longitude": 75.8061956600232,
+    "severity": "CRITICAL",
+    "batteryLevel": 41,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Hillside Trek Route km 12 (Simulated Test Alert)",
+    "receivedAt": 1787312533512,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-BQYWAD",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787312519405,
+    "latitude": 26.88907595608442,
+    "longitude": 75.75586266777364,
+    "severity": "CRITICAL",
+    "batteryLevel": 29,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Coastal Bridge Settlement (Simulated Test Alert)",
+    "receivedAt": 1787312519405,
+    "status": "ACTIVE"
+  },
+  {
+    "messageId": "SOS-QP1C0P",
+    "senderId": "DEVICE-A-VICTIM",
+    "timestamp": 1787312477165,
+    "latitude": 26.915046121364025,
+    "longitude": 75.78899031123248,
+    "severity": "CRITICAL",
+    "batteryLevel": 25,
+    "ttl": 2,
+    "hopCount": 3,
+    "relayPath": [
+      "DEVICE-A-VICTIM",
+      "DEVICE-B-RELAY",
+      "DEVICE-C-RELAY",
+      "DEVICE-D-GATEWAY"
+    ],
+    "gatewayId": "DEVICE-D-GATEWAY",
+    "messageText": "Flash flood evacuation needed at Sector 4, Central Flood Zone (Simulated Test Alert)",
+    "receivedAt": 1787312477165,
+    "status": "ACTIVE"
+  }
+]
