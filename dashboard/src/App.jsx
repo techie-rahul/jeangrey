@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { Shield, Radio, RefreshCw, Volume2, VolumeX, Terminal, Sparkles, Filter } from 'lucide-react';
+import { Shield, Radio, RefreshCw, Volume2, VolumeX, Terminal, Sparkles, Trash2 } from 'lucide-react';
 import EmergencyMap from './components/EmergencyMap';
 import AlertCard from './components/AlertCard';
 import StatsBar from './components/StatsBar';
@@ -22,6 +22,7 @@ export default function App() {
   const [filter, setFilter] = useState('ALL'); // ALL, ACTIVE, RESOLVED
   const [packetLogs, setPacketLogs] = useState([]);
   const [simulating, setSimulating] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const socketRef = useRef(null);
 
@@ -110,6 +111,13 @@ export default function App() {
       fetchStats();
     });
 
+    socket.on('clear_all_sos', () => {
+      setAlerts([]);
+      setSelectedAlert(null);
+      addPacketLog('🧹 Database reset: All emergency alerts cleared.');
+      fetchStats();
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -135,6 +143,17 @@ export default function App() {
       console.error('Simulation error', err);
     } finally {
       setTimeout(() => setSimulating(false), 500);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setClearing(true);
+    try {
+      await fetch(`${SERVER_URL}/api/sos`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Clear error', err);
+    } finally {
+      setTimeout(() => setClearing(false), 500);
     }
   };
 
@@ -174,6 +193,16 @@ export default function App() {
           >
             {audioEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4" />}
             <span className="hidden sm:inline">{audioEnabled ? 'Siren ON' : 'Muted'}</span>
+          </button>
+
+          <button
+            onClick={handleClearAll}
+            disabled={clearing || alerts.length === 0}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs font-semibold py-2 px-3 rounded-lg border border-slate-700 transition flex items-center gap-1.5 active:scale-95 disabled:opacity-40"
+            title="Clear all stored alerts"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden sm:inline">Clear Feed</span>
           </button>
 
           <button

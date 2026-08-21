@@ -11,7 +11,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PATCH']
+    methods: ['GET', 'POST', 'PATCH', 'DELETE']
   }
 });
 
@@ -115,7 +115,16 @@ app.get('/api/sos', (req, res) => {
   res.json({ count: sosAlerts.length, alerts: sosAlerts });
 });
 
-// 3. Update alert status
+// 3. Clear all SOS alerts (Reset Database)
+app.delete('/api/sos', (req, res) => {
+  sosAlerts = [];
+  saveAlerts();
+  io.emit('clear_all_sos');
+  console.log('🧹 [DATABASE CLEARED] All SOS alerts reset.');
+  res.json({ status: 'SUCCESS', message: 'Database reset successfully' });
+});
+
+// 4. Update alert status
 app.patch('/api/sos/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -132,7 +141,7 @@ app.patch('/api/sos/:id/status', (req, res) => {
   res.json({ status: 'UPDATED', alert });
 });
 
-// 4. Statistics Endpoint
+// 5. Statistics Endpoint
 app.get('/api/stats', (req, res) => {
   const total = sosAlerts.length;
   const active = sosAlerts.filter(a => a.status === 'ACTIVE').length;
@@ -150,7 +159,7 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-// 5. Test Simulator Route
+// 6. Test Simulator Route
 app.post('/api/sos/simulate', (req, res) => {
   const sampleLocations = [
     { lat: 26.9124, lng: 75.7873, area: 'Sector 4, Central Flood Zone' },

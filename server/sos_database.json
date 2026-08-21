@@ -15,7 +15,7 @@
     ],
     "gatewayId": "SAMSUNG-SM-S936B",
     "messageText": "EMERGENCY: Immediate Evacuation & Medical Support Requested!",
-    "status": "ACTIVE"
+    "status": "RESOLVED"
   },
   {
     "messageId": "SOS-54352C",
