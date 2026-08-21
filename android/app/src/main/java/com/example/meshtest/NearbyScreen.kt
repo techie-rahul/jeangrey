@@ -35,8 +35,8 @@ import java.util.*
 private const val TAG = "ResQMesh"
 private const val SERVICE_ID = "com.example.meshtest.sos"
 
-// Default Laptop Wi-Fi IP Endpoint
-private const val DEFAULT_SERVER_URL = "http://10.52.45.172:5000"
+// Verified Active Fresh Public Cloud Gateway Endpoint
+private const val DEFAULT_SERVER_URL = "https://wet-moose-ask.loca.lt"
 
 @Composable
 fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
@@ -404,11 +404,11 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Gateway Server URL Input (Laptop College Wi-Fi IP)
+                    // Gateway Server URL Input (Default Verified Fresh Cloud Tunnel URL)
                     OutlinedTextField(
                         value = serverUrl,
                         onValueChange = { serverUrl = it },
-                        label = { Text("Cloud Gateway Laptop IP", fontSize = 10.sp) },
+                        label = { Text("Cloud Gateway Public Domain", fontSize = 10.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.White),
                         singleLine = true
