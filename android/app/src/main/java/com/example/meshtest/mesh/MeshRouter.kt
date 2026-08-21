@@ -62,8 +62,11 @@ class MeshRouter(private val localDeviceName: String) {
             gatewayId = if (shouldUpload) localDeviceName else packet.gatewayId
         )
 
+        // Use forwardPacket for gateway upload so hop count & relay path reflect this relay node
+        val packetForGateway = if (shouldUpload) forwardPacket else packet
+
         return Pair(packet, MeshDecision.ProcessAndRelay(
-            originalPacket = packet,
+            originalPacket = packetForGateway,
             packetToForward = forwardPacket,
             shouldUploadToGateway = shouldUpload
         ))
