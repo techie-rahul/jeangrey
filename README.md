@@ -83,4 +83,4 @@ Open **`http://localhost:3000`** in your browser.
 2. Connect your Android devices (USB Debugging ON).
 3. Build and install on 2 or more physical devices.
 4. Tap **"Start Mesh"** on all devices.
-5. On any offline device, tap **"🚨 BROADCAST SOS"** and watch the packet hop to the connected gateway and appear on the web dashboard!
+5. On any offline device, tap **"🚨 BROADCAST SOS"** to send an emergency packet through the mesh network to a connected gateway, where it instantly appears on the web dashboard!
