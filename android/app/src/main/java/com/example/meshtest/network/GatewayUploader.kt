@@ -49,8 +49,11 @@ object GatewayUploader {
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 conn.setRequestProperty("Accept", "application/json")
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
+                // Bypass localtunnel reminder landing page
+                conn.setRequestProperty("Bypass-Tunnel-Reminder", "true")
+                conn.setRequestProperty("User-Agent", "ResQMesh-Mobile-Gateway")
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
                 conn.doOutput = true
                 conn.doInput = true
 

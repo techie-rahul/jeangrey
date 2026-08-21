@@ -35,6 +35,9 @@ import java.util.*
 private const val TAG = "ResQMesh"
 private const val SERVICE_ID = "com.example.meshtest.sos"
 
+// Default Fresh Public Tunnel Endpoint
+private const val DEFAULT_SERVER_URL = "https://some-parts-accept.loca.lt"
+
 @Composable
 fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectionsClient = remember { Nearby.getConnectionsClient(context) }
@@ -48,7 +51,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
     // State
     var isMeshActive by remember { mutableStateOf(false) }
-    var serverUrl by remember { mutableStateOf("http://10.174.6.243:5000") }
+    var serverUrl by remember { mutableStateOf(DEFAULT_SERVER_URL) }
     var isGatewayModeEnabled by remember { mutableStateOf(true) }
     val connectedEndpoints = remember { mutableStateMapOf<String, String>() } // id -> name
     val connectingEndpoints = remember { mutableStateSetOf<String>() }
@@ -71,6 +74,11 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 listState.animateScrollToItem(terminalLogs.size - 1)
             }
         }
+    }
+
+    fun clearLogs() {
+        terminalLogs.clear()
+        addLog("🧹 Log cleared.")
     }
 
     // --- Broadcast SOS Helper ---
@@ -182,9 +190,6 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
                 Log.d(TAG, "Found endpoint: ${info.endpointName} ($endpointId)")
                 
-                // Deterministic Tie-Breaker:
-                // Only the device with the alphabetically SMALLER name sends the connection request.
-                // This completely eliminates simultaneous connection collisions!
                 val shouldInitiate = localDeviceName < info.endpointName
 
                 if (shouldInitiate && !connectedEndpoints.containsKey(endpointId) && !connectingEndpoints.contains(endpointId)) {
@@ -399,11 +404,11 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Gateway Server IP Input (Defaults directly to your laptop's Wi-Fi IP)
+                    // Gateway Server URL Input
                     OutlinedTextField(
                         value = serverUrl,
                         onValueChange = { serverUrl = it },
-                        label = { Text("Cloud Gateway Server URL", fontSize = 10.sp) },
+                        label = { Text("Cloud Gateway Domain / Endpoint", fontSize = 10.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.White),
                         singleLine = true
@@ -413,15 +418,27 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Live Relay Terminal Log
-            Text(
-                text = "LIVE MESH TELEMETRY LOG",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = Color(0xFF94A3B8),
-                modifier = Modifier.align(Alignment.Start)
-            )
+            // Live Relay Terminal Log Header + Clear Button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "LIVE MESH TELEMETRY LOG",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = Color(0xFF94A3B8)
+                )
+
+                TextButton(
+                    onClick = { clearLogs() },
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text("🧹 Clear Log", fontSize = 11.sp, color = Color(0xFF38BDF8), fontFamily = FontFamily.Monospace)
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 
