@@ -404,15 +404,24 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    // Gateway Server URL Input (Default Verified Fresh Cloud Tunnel URL)
-                    OutlinedTextField(
-                        value = serverUrl,
-                        onValueChange = { serverUrl = it },
-                        label = { Text("Cloud Gateway Public Domain", fontSize = 10.sp) },
+                    // Gateway Server URL Display (Automatically Configured)
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color.White),
-                        singleLine = true
-                    )
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Cloud Gateway",
+                            fontSize = 11.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Text(
+                            text = DEFAULT_SERVER_URL,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF38BDF8)
+                        )
+                    }
                 }
             }
 
