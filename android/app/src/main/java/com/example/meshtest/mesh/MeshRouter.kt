@@ -47,8 +47,15 @@ class MeshRouter(private val localDeviceName: String) {
         // 3. Check TTL for forwarding
         if (packet.ttl <= 1) {
             Log.d(TAG, "TTL expired for ${packet.messageId} (TTL was ${packet.ttl})")
+            val packetForGateway = if (shouldUpload) packet.copy(
+                ttl = 0,
+                hopCount = packet.hopCount + 1,
+                relayPath = packet.relayPath + localDeviceName,
+                gatewayId = localDeviceName
+            ) else packet
+
             return Pair(packet, MeshDecision.ProcessAndRelay(
-                originalPacket = packet,
+                originalPacket = packetForGateway,
                 packetToForward = null,
                 shouldUploadToGateway = shouldUpload
             ))
@@ -62,8 +69,11 @@ class MeshRouter(private val localDeviceName: String) {
             gatewayId = if (shouldUpload) localDeviceName else packet.gatewayId
         )
 
+        // Use forwardPacket for gateway upload so hop count & relay path reflect this relay node
+        val packetForGateway = if (shouldUpload) forwardPacket else packet
+
         return Pair(packet, MeshDecision.ProcessAndRelay(
-            originalPacket = packet,
+            originalPacket = packetForGateway,
             packetToForward = forwardPacket,
             shouldUploadToGateway = shouldUpload
         ))

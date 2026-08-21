@@ -559,7 +559,6 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-
             // Live Relay Terminal Log Header + Clear Button
             Row(
                 modifier = Modifier.fillMaxWidth(),

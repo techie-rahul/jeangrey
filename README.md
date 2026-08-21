@@ -2,6 +2,9 @@
 
 > **Track 6: Disaster Management & Public Safety**  
 > **Problem 6.1: Offline Mesh SOS Relay for Signal-Dead Zones**
+> 
+> 🌐 **Live Cloud Gateway**: [https://jeangrey.onrender.com](https://jeangrey.onrender.com)  
+> 🗺️ **Control Dashboard**: [https://jeangrey.onrender.com/api/sos](https://jeangrey.onrender.com/api/sos)
 
 ---
 

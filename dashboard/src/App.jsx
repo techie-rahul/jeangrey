@@ -5,7 +5,7 @@ import EmergencyMap from './components/EmergencyMap';
 import AlertCard from './components/AlertCard';
 import StatsBar from './components/StatsBar';
 
-const SERVER_URL = 'http://localhost:5000';
+const SERVER_URL = 'https://jeangrey.onrender.com';
 
 export default function App() {
   const [alerts, setAlerts] = useState([]);
