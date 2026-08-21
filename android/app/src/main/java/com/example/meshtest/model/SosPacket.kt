@@ -16,6 +16,8 @@ data class SosPacket(
     val latitude: Double = 26.9124,
     val longitude: Double = 75.7873,
     val severity: String = "CRITICAL",
+    val priority: String = "HIGH",
+    val emergencyType: String? = null,
     val batteryLevel: Int = 100,
     val ttl: Int = 5,
     val hopCount: Int = 0,
@@ -31,6 +33,10 @@ data class SosPacket(
         json.put("latitude", latitude)
         json.put("longitude", longitude)
         json.put("severity", severity)
+        json.put("priority", priority)
+        if (emergencyType != null) {
+            json.put("emergencyType", emergencyType)
+        }
         json.put("batteryLevel", batteryLevel)
         json.put("ttl", ttl)
         json.put("hopCount", hopCount)
@@ -64,6 +70,14 @@ data class SosPacket(
                     }
                 }
 
+                val priorityVal = if (json.has("priority")) {
+                    json.getString("priority")
+                } else if (json.has("severity") && json.getString("severity") == "CRITICAL") {
+                    "HIGH"
+                } else {
+                    "MEDIUM"
+                }
+
                 SosPacket(
                     messageId = json.optString("messageId", "UNKNOWN_ID"),
                     senderId = json.optString("senderId", "UNKNOWN_SENDER"),
@@ -71,6 +85,8 @@ data class SosPacket(
                     latitude = json.optDouble("latitude", 26.9124),
                     longitude = json.optDouble("longitude", 75.7873),
                     severity = json.optString("severity", "CRITICAL"),
+                    priority = priorityVal,
+                    emergencyType = if (json.has("emergencyType")) json.getString("emergencyType") else null,
                     batteryLevel = json.optInt("batteryLevel", 100),
                     ttl = json.optInt("ttl", 0),
                     hopCount = json.optInt("hopCount", 0),

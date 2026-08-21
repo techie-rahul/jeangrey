@@ -24,7 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.meshtest.mesh.MeshDecision
 import com.example.meshtest.mesh.MeshRouter
+import com.example.meshtest.model.EmergencyType
 import com.example.meshtest.model.SosPacket
+import com.example.meshtest.model.SosPriority
+import com.example.meshtest.model.SosPriorityCalculator
+import com.example.meshtest.model.SosPriorityQueue
 import com.example.meshtest.network.GatewayUploader
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
@@ -56,6 +60,12 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectedEndpoints = remember { mutableStateMapOf<String, String>() } // id -> name
     val connectingEndpoints = remember { mutableStateSetOf<String>() }
     val terminalLogs = remember { mutableStateListOf<String>() }
+
+    // Priority Relay Queue & UI State
+    val priorityQueue = remember { SosPriorityQueue() }
+    var relayQueueItems by remember { mutableStateOf(listOf<SosPacket>()) }
+    var showSituationDialog by remember { mutableStateOf(false) }
+    var createdSosInfo by remember { mutableStateOf<Triple<String, SosPriority, Int>?>(null) }
 
     fun getBatteryPercentage(): Int {
         return try {
@@ -127,7 +137,9 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                         }
                         is MeshDecision.ProcessAndRelay -> {
                             val orig = decision.originalPacket
-                            addLog("🚨 RX SOS ${orig.messageId} | Origin: ${orig.senderId} | Hops: ${orig.hopCount}")
+                            priorityQueue.enqueue(orig)
+                            relayQueueItems = priorityQueue.getAll()
+                            addLog("🚨 RX SOS ${orig.messageId} | Priority: ${orig.priority} | Origin: ${orig.senderId} | Hops: ${orig.hopCount}")
 
                             // Check Gateway Upload
                             if (decision.shouldUploadToGateway) {
@@ -241,19 +253,32 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         addLog("🛑 Mesh Stopped")
     }
 
-    fun triggerSos() {
+    fun triggerPrioritySos(type: EmergencyType) {
         val battery = getBatteryPercentage()
+        val priority = SosPriorityCalculator.calculate(type, battery)
+        val msgText = when (type) {
+            EmergencyType.LOST_ASSISTANCE -> "ASSISTANCE NEEDED: User is lost / needs search & rescue support."
+            EmergencyType.EMERGENCY -> "CRITICAL EMERGENCY: Immediate Medical & Evacuation Support Requested!"
+        }
+
         val sos = SosPacket(
             senderId = localDeviceName,
             batteryLevel = battery,
+            priority = priority.label,
+            emergencyType = type.name,
+            severity = if (priority == SosPriority.MEDIUM) "MEDIUM" else "CRITICAL",
             ttl = 5,
             hopCount = 0,
             relayPath = listOf(localDeviceName),
-            messageText = "EMERGENCY: Immediate Evacuation & Medical Support Requested!"
+            messageText = msgText
         )
 
         meshRouter.registerLocalSos(sos)
-        addLog("🚨 [SOS INITIATED] ID: ${sos.messageId} | TTL: ${sos.ttl}")
+        priorityQueue.enqueue(sos)
+        relayQueueItems = priorityQueue.getAll()
+
+        createdSosInfo = Triple(sos.messageId, priority, battery)
+        addLog("🚨 [SOS INITIATED] ID: ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
 
         if (isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)) {
             addLog("🌐 LOCAL GATEWAY: Uploading directly to cloud backend...")
@@ -340,7 +365,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
             // Big Red SOS Button
             Button(
-                onClick = { triggerSos() },
+                onClick = { showSituationDialog = true },
                 enabled = permissionsGranted,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -348,12 +373,18 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "🚨 BROADCAST SOS",
+                        text = "🚨 SOS",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
+                    )
+                    Text(
+                        text = "HOLD OR TAP TO SELECT SITUATION & SEND",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -425,7 +456,109 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Relay Queue Visualization Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, Color(0xFF334155))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "RELAY QUEUE (PRIORITY ORDER)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Text(
+                            text = "${relayQueueItems.size} in queue",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF38BDF8)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (relayQueueItems.isEmpty()) {
+                        Text(
+                            text = "Queue empty. Broadcast or receive an SOS to see priority forwarding order.",
+                            fontSize = 10.sp,
+                            color = Color(0xFF64748B),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else {
+                        relayQueueItems.take(3).forEachIndexed { idx, item ->
+                            val priorityEnum = SosPriority.fromString(item.priority)
+                            val badgeColor = when (priorityEnum) {
+                                SosPriority.URGENT -> Color(0xFFEF4444)
+                                SosPriority.HIGH -> Color(0xFFF97316)
+                                SosPriority.MEDIUM -> Color(0xFFEAB308)
+                            }
+                            val statusLabel = if (idx == 0) "Forwarding first" else "Queued"
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = when (priorityEnum) {
+                                            SosPriority.URGENT -> "🚨"
+                                            SosPriority.HIGH -> "🟠"
+                                            SosPriority.MEDIUM -> "🟡"
+                                        },
+                                        fontSize = 13.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = item.messageId,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Bat: ${item.batteryLevel}% • $statusLabel",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF94A3B8)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = badgeColor.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, badgeColor)
+                                ) {
+                                    Text(
+                                        text = priorityEnum.label,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = badgeColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Live Relay Terminal Log Header + Clear Button
             Row(
@@ -494,5 +627,183 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 }
             }
         }
+    }
+
+    // --- Situation Selection Dialog ---
+    if (showSituationDialog) {
+        AlertDialog(
+            onDismissRequest = { showSituationDialog = false },
+            containerColor = Color(0xFF1E293B),
+            title = {
+                Text(
+                    text = "WHAT'S HAPPENING?",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Select your current emergency situation:",
+                        fontSize = 13.sp,
+                        color = Color(0xFF94A3B8)
+                    )
+
+                    // Option 1: Lost / Need Assistance
+                    Surface(
+                        onClick = {
+                            showSituationDialog = false
+                            triggerPrioritySos(EmergencyType.LOST_ASSISTANCE)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF0F172A),
+                        border = BorderStroke(1.dp, Color(0xFFEAB308).copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🧭", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "I'm lost / need assistance",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Non-life-threatening assistance",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                    }
+
+                    // Option 2: In an Emergency
+                    Surface(
+                        onClick = {
+                            showSituationDialog = false
+                            triggerPrioritySos(EmergencyType.EMERGENCY)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF0F172A),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🚨", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "I'm in an emergency",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Critical danger / medical urgent",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF94A3B8)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showSituationDialog = false }) {
+                    Text("Cancel", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
+
+    // --- SOS Confirmation / Result Dialog ---
+    createdSosInfo?.let { (msgId, priority, battery) ->
+        val badgeColor = when (priority) {
+            SosPriority.URGENT -> Color(0xFFEF4444)
+            SosPriority.HIGH -> Color(0xFFF97316)
+            SosPriority.MEDIUM -> Color(0xFFEAB308)
+        }
+
+        AlertDialog(
+            onDismissRequest = { createdSosInfo = null },
+            containerColor = Color(0xFF1E293B),
+            title = {
+                Text(
+                    text = "SOS CREATED",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("SOS ID:", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                        Text(msgId, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Priority:", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = badgeColor.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, badgeColor)
+                        ) {
+                            Text(
+                                text = priority.label,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = badgeColor
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Battery Level:", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                        Text("$battery%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Your SOS will be given priority in the relay network.",
+                        fontSize = 12.sp,
+                        color = Color(0xFF38BDF8),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { createdSosInfo = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                ) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }
