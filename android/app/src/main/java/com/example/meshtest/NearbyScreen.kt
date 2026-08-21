@@ -36,7 +36,7 @@ private const val TAG = "ResQMesh"
 private const val SERVICE_ID = "com.example.meshtest.sos"
 
 // Verified Active Fresh Public Cloud Gateway Endpoint
-private const val DEFAULT_SERVER_URL = "http://10.43.184.160:5000"
+private const val DEFAULT_SERVER_URL = "https://jeangrey.onrender.com"
 
 @Composable
 fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
