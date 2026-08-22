@@ -138,48 +138,13 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     }
 
     fun triggerEmergencyMessage(text: String) {
-        val battery = getBatteryPercentage()
-        val priority = SosPriority.HIGH
-        
         val sosLat = latitude ?: 0.0
         val sosLng = longitude ?: 0.0
-        Log.d(TAG, "📍 MESSAGE LOCATION CAPTURED: lat=$sosLat, lng=$sosLng")
-        addLog("📍 Location: lat=$sosLat, lng=$sosLng")
-
-        val sos = SosPacket(
-            senderId = localDeviceName,
-            batteryLevel = battery,
-            priority = priority.label,
-            emergencyType = EmergencyType.EMERGENCY.name,
-            severity = "CRITICAL",
-            latitude = sosLat,
-            longitude = sosLng,
-            ttl = 5,
-            hopCount = 0,
-            relayPath = listOf(localDeviceName),
-            messageText = text,
-            packetType = "MESSAGE"
-        )
-
-        meshRouter.registerLocalSos(sos)
-        priorityQueue.enqueue(sos)
-        relayQueueItems = priorityQueue.getAll()
-
-        createdSosInfo = Triple(sos.messageId, priority, battery)
-        addLog("💬 [MSG INITIATED] ID: ${sos.messageId} | Priority: ${priority.label}")
-
-        if (isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)) {
-            addLog("🌐 LOCAL GATEWAY: Uploading directly to cloud backend...")
-            sos.gatewayId = localDeviceName
-            GatewayUploader.uploadSos(
-                serverBaseUrl = serverUrl,
-                packet = sos,
-                onSuccess = { res -> addLog("✅ Direct Cloud Upload: $res") },
-                onError = { err -> addLog("❌ Direct Cloud Upload Failed: $err") }
-            )
-        }
-
-        broadcastPacketToPeers(sos)
+        val battery = getBatteryPercentage()
+        val priority = SosPriority.HIGH
+        addLog("📍 Message Location: lat=$sosLat, lng=$sosLng")
+        createdSosInfo = Triple("MSG-" + (100000..999999).random().toString(16).uppercase(), priority, battery)
+        com.example.meshtest.service.MeshForegroundService.triggerEmergencyMessage(context, text, sosLat, sosLng)
     }
 
     fun openInGoogleMaps() {

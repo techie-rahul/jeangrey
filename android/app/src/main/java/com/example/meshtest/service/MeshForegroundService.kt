@@ -88,6 +88,12 @@ class MeshForegroundService : Service() {
                 val lng = intent?.getDoubleExtra(EXTRA_LONGITUDE, 0.0) ?: 0.0
                 triggerSos(type, lat, lng)
             }
+            ACTION_BROADCAST_MESSAGE -> {
+                val messageText = intent?.getStringExtra(EXTRA_CUSTOM_MESSAGE) ?: "EMERGENCY MESSAGE"
+                val lat = intent?.getDoubleExtra(EXTRA_LATITUDE, 0.0) ?: 0.0
+                val lng = intent?.getDoubleExtra(EXTRA_LONGITUDE, 0.0) ?: 0.0
+                triggerEmergencyMessage(messageText, lat, lng)
+            }
         }
         return START_STICKY
     }
@@ -180,6 +186,38 @@ class MeshForegroundService : Service() {
         priorityQueue.enqueue(sos)
         MeshRepository.updateRelayQueue(priorityQueue.getAll())
         MeshRepository.addLog("🚨 SOS ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
+
+        if (MeshRepository.isGatewayModeEnabled.value && GatewayUploader.hasInternetConnection(this)) {
+            sos.gatewayId = localDeviceName
+            GatewayUploader.uploadSos(MeshRepository.serverUrl.value, sos,
+                onSuccess = { MeshRepository.addLog("✅ Cloud Upload OK") },
+                onError   = { e -> MeshRepository.addLog("❌ Cloud Upload Failed: $e") }
+            )
+        }
+        broadcastToPeers(sos)
+    }
+
+    private fun triggerEmergencyMessage(text: String, lat: Double, lng: Double) {
+        val battery = getBatteryPercentage()
+        val priority = SosPriority.HIGH
+        val sos = SosPacket(
+            senderId = localDeviceName,
+            batteryLevel = battery,
+            priority = priority.label,
+            emergencyType = EmergencyType.EMERGENCY.name,
+            severity = "CRITICAL",
+            latitude = lat,
+            longitude = lng,
+            ttl = 5,
+            hopCount = 0,
+            relayPath = listOf(localDeviceName),
+            messageText = text,
+            packetType = "MESSAGE"
+        )
+        meshRouter.registerLocalSos(sos)
+        priorityQueue.enqueue(sos)
+        MeshRepository.updateRelayQueue(priorityQueue.getAll())
+        MeshRepository.addLog("💬 MSG ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
 
         if (MeshRepository.isGatewayModeEnabled.value && GatewayUploader.hasInternetConnection(this)) {
             sos.gatewayId = localDeviceName
@@ -406,12 +444,14 @@ class MeshForegroundService : Service() {
 
     // ── Static Helpers ──────────────────────────────────────────────────
     companion object {
-        const val ACTION_START_MESH    = "com.example.meshtest.START_MESH"
-        const val ACTION_STOP_MESH     = "com.example.meshtest.STOP_MESH"
-        const val ACTION_BROADCAST_SOS = "com.example.meshtest.BROADCAST_SOS"
-        const val EXTRA_EMERGENCY_TYPE = "extra_emergency_type"
-        const val EXTRA_LATITUDE       = "extra_latitude"
-        const val EXTRA_LONGITUDE      = "extra_longitude"
+        const val ACTION_START_MESH        = "com.example.meshtest.START_MESH"
+        const val ACTION_STOP_MESH         = "com.example.meshtest.STOP_MESH"
+        const val ACTION_BROADCAST_SOS     = "com.example.meshtest.BROADCAST_SOS"
+        const val ACTION_BROADCAST_MESSAGE = "com.example.meshtest.BROADCAST_MESSAGE"
+        const val EXTRA_EMERGENCY_TYPE     = "extra_emergency_type"
+        const val EXTRA_CUSTOM_MESSAGE     = "extra_custom_message"
+        const val EXTRA_LATITUDE           = "extra_latitude"
+        const val EXTRA_LONGITUDE          = "extra_longitude"
 
         fun startService(context: Context) {
             val i = Intent(context, MeshForegroundService::class.java).apply { action = ACTION_START_MESH }
@@ -427,6 +467,16 @@ class MeshForegroundService : Service() {
             val i = Intent(context, MeshForegroundService::class.java).apply {
                 action = ACTION_BROADCAST_SOS
                 putExtra(EXTRA_EMERGENCY_TYPE, type.name)
+                putExtra(EXTRA_LATITUDE, lat); putExtra(EXTRA_LONGITUDE, lng)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i)
+            else context.startService(i)
+        }
+
+        fun triggerEmergencyMessage(context: Context, text: String, lat: Double, lng: Double) {
+            val i = Intent(context, MeshForegroundService::class.java).apply {
+                action = ACTION_BROADCAST_MESSAGE
+                putExtra(EXTRA_CUSTOM_MESSAGE, text)
                 putExtra(EXTRA_LATITUDE, lat); putExtra(EXTRA_LONGITUDE, lng)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i)
