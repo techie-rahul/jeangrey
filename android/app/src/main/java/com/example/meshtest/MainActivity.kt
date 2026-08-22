@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             needed.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            needed.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         // Location is needed on Android < 12 for BLE scanning,
