@@ -37,6 +37,11 @@ import com.example.meshtest.model.SosPriorityQueue
 import com.example.meshtest.network.GatewayUploader
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -81,13 +86,15 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectedEndpoints = remember { mutableStateMapOf<String, String>() } // id -> name
     val connectingEndpoints = remember { mutableStateSetOf<String>() }
     val terminalLogs = remember { mutableStateListOf<String>() }
+    var isRateLimited by remember { mutableStateOf(false) }
 
     // ── Location state ──────────────────────────────────────────────────
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
+    var locAccuracy by remember { mutableStateOf<Float?>(null) }
     var locTimestamp by remember { mutableStateOf<Long?>(null) }
 
-    // Acquire real device GPS location continuously
+    // Acquire real device GPS location continuously using FusedLocationProviderClient + LocationManager
     LaunchedEffect(permissionsGranted) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED ||
@@ -95,21 +102,51 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             == PackageManager.PERMISSION_GRANTED
         ) {
             try {
+                // 1. Google Play Services Fused Location Provider (Fastest & Most Accurate)
+                val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+                fusedClient.lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        latitude = loc.latitude
+                        longitude = loc.longitude
+                        locAccuracy = loc.accuracy
+                        locTimestamp = loc.time
+                        Log.d(TAG, "📍 FUSED LAST LOCATION: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
+                    }
+                }
+
+                val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
+                    .setMinUpdateIntervalMillis(1000L)
+                    .build()
+
+                val locationCallback = object : LocationCallback() {
+                    override fun onLocationResult(result: LocationResult) {
+                        val loc = result.lastLocation ?: return
+                        latitude = loc.latitude
+                        longitude = loc.longitude
+                        locAccuracy = loc.accuracy
+                        locTimestamp = loc.time
+                        Log.d(TAG, "📍 ACCURATE GPS FIX: lat=${loc.latitude}, lng=${loc.longitude}, accuracy=${loc.accuracy}m")
+                    }
+                }
+                fusedClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+
+                // 2. Fallback to System LocationManager
                 val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                // Use last-known location as an immediate fallback
                 val lastLoc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                     ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                     ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-                if (lastLoc != null) {
+                if (lastLoc != null && latitude == null) {
                     latitude = lastLoc.latitude
                     longitude = lastLoc.longitude
+                    locAccuracy = lastLoc.accuracy
                     locTimestamp = lastLoc.time
                     Log.d(TAG, "📍 INITIAL LOCATION: lat=${lastLoc.latitude}, lng=${lastLoc.longitude}")
                 }
-                // Request continuous fresh location updates
+
                 val locationListener = android.location.LocationListener { l ->
                     latitude = l.latitude
                     longitude = l.longitude
+                    locAccuracy = l.accuracy
                     locTimestamp = l.time
                     Log.d(TAG, "📍 ACCURATE GPS FIX: lat=${l.latitude}, lng=${l.longitude}, accuracy=${l.accuracy}m")
                 }
@@ -213,7 +250,12 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                                         addLog("✅ CLOUD UPLOAD SUCCESS: $res")
                                     },
                                     onError = { err ->
-                                        addLog("❌ CLOUD UPLOAD ERROR: $err")
+                                        if (err == "RATE_LIMITED") {
+                                            isRateLimited = true
+                                            addLog("⚠️ Rate limit reached — SOS queued locally, don't panic!")
+                                        } else {
+                                            addLog("❌ CLOUD UPLOAD ERROR: $err")
+                                        }
                                     }
                                 )
                             }
@@ -356,7 +398,14 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 serverBaseUrl = serverUrl,
                 packet = sos,
                 onSuccess = { res -> addLog("✅ Direct Cloud Upload: $res") },
-                onError = { err -> addLog("❌ Direct Cloud Upload Failed: $err") }
+                onError = { err ->
+                    if (err == "RATE_LIMITED") {
+                        isRateLimited = true
+                        addLog("⚠️ Rate limit reached — SOS queued locally, don't panic!")
+                    } else {
+                        addLog("❌ Direct Cloud Upload Failed: $err")
+                    }
+                }
             )
         }
 
@@ -530,6 +579,42 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // ── Rate Limit Warning Banner ─────────────────────────────────
+            if (isRateLimited) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF451A03)),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⚠️  Too many requests — Don't panic!",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFBBF24)
+                            )
+                            Text(
+                                text = "Your SOS has been saved locally. The cloud will sync shortly.",
+                                fontSize = 11.sp,
+                                color = Color(0xFFFDE68A)
+                            )
+                        }
+                        TextButton(onClick = { isRateLimited = false }) {
+                            Text("✕", color = Color(0xFFF59E0B), fontSize = 16.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Big Red SOS Button
             Button(
                 onClick = { showSituationDialog = true },
@@ -614,6 +699,28 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
                             color = if (currentBatteryPct <= 15 || isPowerSaveMode) Color(0xFFF59E0B) else Color(0xFF10B981)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Live GPS Fix Display
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("📍 GPS Location", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        Text(
+                            text = if (latitude != null && longitude != null) {
+                                "%.4f, %.4f".format(Locale.US, latitude, longitude) + (locAccuracy?.let { " (±${it.toInt()}m)" } ?: "")
+                            } else {
+                                "Acquiring GPS Fix..."
+                            },
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (latitude != null && longitude != null) Color(0xFF10B981) else Color(0xFFF59E0B)
                         )
                     }
 

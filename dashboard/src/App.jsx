@@ -23,6 +23,7 @@ export default function App() {
   const [packetLogs, setPacketLogs] = useState([]);
   const [simulating, setSimulating] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [rateLimitBanner, setRateLimitBanner] = useState(false);
 
   const socketRef = useRef(null);
 
@@ -138,7 +139,10 @@ export default function App() {
   const handleSimulate = async () => {
     setSimulating(true);
     try {
-      await fetch(`${SERVER_URL}/api/sos/simulate`, { method: 'POST' });
+      const res = await fetch(`${SERVER_URL}/api/sos/simulate`, { method: 'POST' });
+      if (res.status === 429) {
+        setRateLimitBanner(true);
+      }
     } catch (err) {
       console.error('Simulation error', err);
     } finally {
@@ -165,6 +169,25 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-dark-900 text-slate-100 flex flex-col">
+      {/* Rate Limit Banner */}
+      {rateLimitBanner && (
+        <div className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-amber-900/80 border-b border-amber-500 px-4 py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-lg">⚠️</span>
+            <div>
+              <p className="text-amber-300 font-semibold text-sm">Too many requests — Don't panic!</p>
+              <p className="text-amber-200/70 text-xs">The server is temporarily throttling requests. Your data is safe. Try again in a minute.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setRateLimitBanner(false)}
+            className="text-amber-400 hover:text-amber-200 text-lg font-bold px-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-dark-800/80 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3.5 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">

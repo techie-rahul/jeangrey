@@ -68,6 +68,9 @@ object GatewayUploader {
                     val responseText = conn.inputStream.bufferedReader().use { it.readText() }
                     Log.d(TAG, "Upload SUCCESS ($responseCode): $responseText")
                     onSuccess("Uploaded to Cloud ($responseCode)")
+                } else if (responseCode == 429) {
+                    Log.w(TAG, "Rate limit hit (429) — too many SOS uploads from this gateway")
+                    onError("RATE_LIMITED")
                 } else {
                     val errText = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
                     Log.e(TAG, "Upload FAILED ($responseCode): $errText")
