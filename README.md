@@ -3,8 +3,8 @@
 > **Track 6: Disaster Management & Public Safety**  
 > **Problem 6.1: Offline Mesh SOS Relay for Signal-Dead Zones**
 > 
-> 🌐 **Live Cloud Gateway**: [https://jeangrey.onrender.com](https://jeangrey.onrender.com)  
-> 🗺️ **Control Dashboard**: [https://jeangrey.onrender.com/api/sos](https://jeangrey.onrender.com/api/sos)
+> 🌐 **Live Cloud Gateway**: https://jeangrey.onrender.com
+> 🗺️ **Control Dashboard**: https://jeangrey.vercel.app/
 
 ---
 
@@ -76,7 +76,7 @@ In major disasters (floods, earthquakes, cyclones), cellular towers and internet
 cd server && npm install && npm start
 cd dashboard && npm install && npm run dev
 ```
-Open **`http://localhost:3000`** in your browser.
+Open **`https://jeangrey.onrender.com`** in your browser.
 
 ### 2. Run Android App
 1. Open the `android/` directory in **Android Studio**.
