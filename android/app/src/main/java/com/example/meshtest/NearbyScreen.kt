@@ -87,27 +87,55 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showAllQueueItems by remember { mutableStateOf(false) }
 
-    // Acquire real device GPS location
-    LaunchedEffect(permissionsGranted) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
+    // ── Real device GPS location listener (Continuous with fallback) ──
+    DisposableEffect(permissionsGranted) {
+        var listener: android.location.LocationListener? = null
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+        if (permissionsGranted && lm != null &&
+            (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
+            
+            // Immediate fallback from any cached location provider
+            val lastGps = try { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) } catch (_: Exception) { null }
+            val lastNet = try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (_: Exception) { null }
+            val lastPassive = try { lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (_: Exception) { null }
+            val bestLast = lastGps ?: lastNet ?: lastPassive
+            if (bestLast != null) {
+                latitude = bestLast.latitude
+                longitude = bestLast.longitude
+                locTimestamp = bestLast.time
+                Log.d(TAG, "📍 Cached location fix: lat=${bestLast.latitude}, lng=${bestLast.longitude}")
+            }
+
+            listener = android.location.LocationListener { l ->
+                latitude = l.latitude
+                longitude = l.longitude
+                locTimestamp = l.time
+                Log.d(TAG, "📍 Live GPS fix: lat=${l.latitude}, lng=${l.longitude}, acc=${l.accuracy}m")
+            }
+
+            // Continuous updates from GPS, Network and Passive providers
             try {
-                val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                val lastLoc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                    ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                    ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
-                if (lastLoc != null) {
-                    latitude = lastLoc.latitude; longitude = lastLoc.longitude; locTimestamp = lastLoc.time
+                if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 1f, listener, Looper.getMainLooper())
                 }
-                val locationListener = android.location.LocationListener { l ->
-                    latitude = l.latitude; longitude = l.longitude; locTimestamp = l.time
+            } catch (_: Exception) {}
+            try {
+                if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 1f, listener, Looper.getMainLooper())
                 }
-                @Suppress("DEPRECATION")
-                try { lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
-                @Suppress("DEPRECATION")
-                try { lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
-            } catch (e: Exception) { Log.e(TAG, "Location failed", e) }
+            } catch (_: Exception) {}
+            try {
+                if (lm.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 2000L, 1f, listener, Looper.getMainLooper())
+                }
+            } catch (_: Exception) {}
+        }
+
+        onDispose {
+            listener?.let {
+                try { lm?.removeUpdates(it) } catch (_: Exception) {}
+            }
         }
     }
 
