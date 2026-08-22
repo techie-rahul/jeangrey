@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const fs = require('fs');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,10 +19,43 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 5000;
 const DATA_FILE = path.join(__dirname, 'sos_database.json');
 
+// ------------------- RATE LIMITERS -------------------
+
+// Global limiter — applies to all routes
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,                  // max 200 requests per IP per window
+  standardHeaders: true,     // send RateLimit-* headers
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+// Strict limiter — for SOS ingest (POST /api/sos)
+// A gateway should not flood us; 30 SOS uploads per 10 min per IP is generous
+const sosPostLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'SOS rate limit exceeded. Max 30 submissions per 10 minutes per gateway.' }
+});
+
+// Simulator limiter — prevent spamming the test endpoint
+const simulateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Simulator rate limit exceeded. Max 10 simulations per minute.' }
+});
+
+// -------------------------------------------------------
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+app.use(globalLimiter);
 
 // Local persistence helper
 let sosAlerts = [];
@@ -45,7 +79,7 @@ const saveAlerts = () => {
 // ---------------- REST API ROUTES ----------------
 
 // 1. Gateway Phone Uploads SOS
-app.post('/api/sos', (req, res) => {
+app.post('/api/sos', sosPostLimiter, (req, res) => {
   const {
     messageId,
     senderId,
@@ -166,7 +200,7 @@ app.get('/api/stats', (req, res) => {
 });
 
 // 6. Test Simulator Route
-app.post('/api/sos/simulate', (req, res) => {
+app.post('/api/sos/simulate', simulateLimiter, (req, res) => {
   const sampleLocations = [
     { lat: 26.9124, lng: 75.7873, area: 'Sector 4, Central Flood Zone' },
     { lat: 26.9200, lng: 75.8100, area: 'Hillside Trek Route km 12' },
