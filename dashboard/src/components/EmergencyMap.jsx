@@ -58,7 +58,7 @@ export default function EmergencyMap({ alerts, selectedAlert, onSelectAlert }) {
 
         <AutoCenterMap alerts={alerts} selectedAlert={selectedAlert} />
 
-        {alerts.map((alert) => (
+        {alerts.filter(alert => alert.latitude != null && alert.longitude != null && !isNaN(alert.latitude) && !isNaN(alert.longitude)).map((alert) => (
           <Marker
             key={alert.messageId}
             position={[alert.latitude, alert.longitude]}
@@ -77,12 +77,20 @@ export default function EmergencyMap({ alerts, selectedAlert, onSelectAlert }) {
                 </div>
                 <p className="text-xs text-slate-700 font-medium mb-1">{alert.messageText}</p>
                 <div className="text-[11px] text-slate-500 font-mono space-y-0.5">
-                  <div>📍 {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}</div>
+                  <div>📍 {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)}</div>
                   <div>🔄 Hops: <span className="font-bold text-slate-800">{alert.hopCount}</span></div>
                   <div>📡 Gateway: <span className="font-semibold">{alert.gatewayId}</span></div>
                   {alert.batteryLevel !== null && (
                     <div>🔋 Battery: {alert.batteryLevel}%</div>
                   )}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${alert.latitude},${alert.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-semibold block mt-1"
+                  >
+                    Open in Google Maps ↗
+                  </a>
                 </div>
               </div>
             </Popup>
