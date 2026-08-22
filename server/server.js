@@ -42,6 +42,58 @@ const saveAlerts = () => {
   }
 };
 
+// ---------------- PER-VICTIM RATE LIMITER ----------------
+// 10 emergency packets per original victim (senderId) per 60-second window.
+// Relay devices and gateways do NOT consume quota — the key is always the
+// original sender identity embedded inside the packet, not the uploading device.
+
+const RATE_LIMIT_MAX = 10;          // max requests per window
+const RATE_LIMIT_WINDOW_MS = 60000; // 60 seconds
+
+// Map<senderId, number[]>  — stores timestamps of accepted requests
+const rateLimitStore = new Map();
+
+/**
+ * Returns true if the request should be ALLOWED, false if rate-limited.
+ * Automatically prunes expired timestamps on each call.
+ */
+function checkRateLimit(senderId) {
+  const now = Date.now();
+  let timestamps = rateLimitStore.get(senderId);
+
+  if (!timestamps) {
+    timestamps = [];
+    rateLimitStore.set(senderId, timestamps);
+  }
+
+  // Prune entries older than the window
+  while (timestamps.length > 0 && timestamps[0] <= now - RATE_LIMIT_WINDOW_MS) {
+    timestamps.shift();
+  }
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    return false; // rate-limited
+  }
+
+  timestamps.push(now);
+  return true; // allowed
+}
+
+// Periodic cleanup of stale entries to prevent memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamps] of rateLimitStore.entries()) {
+    // Remove expired timestamps
+    while (timestamps.length > 0 && timestamps[0] <= now - RATE_LIMIT_WINDOW_MS) {
+      timestamps.shift();
+    }
+    // Remove empty entries
+    if (timestamps.length === 0) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, RATE_LIMIT_WINDOW_MS);
+
 // ---------------- REST API ROUTES ----------------
 
 // 1. Gateway Phone Uploads SOS
@@ -64,6 +116,14 @@ app.post('/api/sos', (req, res) => {
 
   if (!messageId || !senderId) {
     return res.status(400).json({ error: 'Missing required fields: messageId, senderId' });
+  }
+
+  // Per-victim rate limit check (keyed by original senderId, NOT relay/gateway)
+  if (!checkRateLimit(senderId)) {
+    console.log(`🚫 [RATE LIMITED] Victim ${senderId} exceeded ${RATE_LIMIT_MAX} requests in ${RATE_LIMIT_WINDOW_MS / 1000}s window`);
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Maximum 10 emergency requests per minute.'
+    });
   }
 
   // Deduplication check on server
