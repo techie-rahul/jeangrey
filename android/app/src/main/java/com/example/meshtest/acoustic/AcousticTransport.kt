@@ -109,7 +109,7 @@ class AcousticTransport(private val context: Context) {
         val preambleSamples = (sampleRate * preambleDuration).toInt()
         for (i in 0 until preambleSamples) {
             val t = i.toDouble() / sampleRate
-            val sample = (0.5 * sin(2.0 * PI * PREAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
+            val sample = (0.85 * sin(2.0 * PI * PREAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
             if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
         }
 
@@ -123,7 +123,7 @@ class AcousticTransport(private val context: Context) {
                 val t = i.toDouble() / sampleRate
                 // Hann window to prevent clicks
                 val window = 0.5 * (1.0 - cos((2.0 * PI * i) / charSamples))
-                val sample = (0.5 * window * sin(2.0 * PI * freq * t) * Short.MAX_VALUE).toInt().toShort()
+                val sample = (0.85 * window * sin(2.0 * PI * freq * t) * Short.MAX_VALUE).toInt().toShort()
                 if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
             }
         }
@@ -132,7 +132,7 @@ class AcousticTransport(private val context: Context) {
         val postambleSamples = (sampleRate * preambleDuration).toInt()
         for (i in 0 until postambleSamples) {
             val t = i.toDouble() / sampleRate
-            val sample = (0.5 * sin(2.0 * PI * POSTAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
+            val sample = (0.85 * sin(2.0 * PI * POSTAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
             if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
         }
 
@@ -145,8 +145,8 @@ class AcousticTransport(private val context: Context) {
         val audioTrack = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build()
             )
             .setAudioFormat(
@@ -161,6 +161,7 @@ class AcousticTransport(private val context: Context) {
             .build()
 
         try {
+            audioTrack.setVolume(1.0f)
             audioTrack.write(audioData, 0, audioData.size)
             audioTrack.play()
             Thread.sleep(((totalSamples.toDouble() / sampleRate) * 1000).toLong() + 100)

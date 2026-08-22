@@ -657,6 +657,28 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             )
                         )
                     }
+
+                    if (isAcousticActive) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                val shortId = "SOS" + (100..999).random()
+                                val geohash = AcousticBeacon.encodeGeohash(latitude ?: 26.9124, longitude ?: 75.7873, 6)
+                                val testBeacon = "$shortId|2|$geohash"
+                                val sent = acousticTransport.transmit(testBeacon)
+                                if (sent) {
+                                    addLog("🔊 [MANUAL CHIRP] Emitted sound beacon: $testBeacon (Zero BLE / Wi-Fi needed)")
+                                } else {
+                                    addLog("⏳ [MANUAL CHIRP] Rate-limited (10s cooldown between chirps)")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
+                        ) {
+                            Text("🔊 TRANSMIT TEST CHIRP NOW", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
                 }
             }
 
