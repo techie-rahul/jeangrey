@@ -13,10 +13,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.*
 
 /**
- * AcousticTransport handles acoustic sound-based data transmission and reception
- * using Frequency Shift Keying (FSK) audio chirps.
+ * High-Performance Acoustic Transport Tier.
+ * Uses Voice-Band MFSK (Multi-Frequency Shift Keying) between 1150 Hz and 2450 Hz.
  *
- * Implements rate-limiting (minimum 10s cooldown) to preserve battery.
+ * Designed specifically for maximum range (10-15m across rooms) without Bluetooth or Wi-Fi.
  */
 class AcousticTransport(private val context: Context) {
     private val TAG = "AcousticTransport"
@@ -29,13 +29,11 @@ class AcousticTransport(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var onBeaconCallback: ((String) -> Unit)? = null
-
-    // Deduplication of recently received acoustic beacons
     private val recentlyReceivedBeacons = mutableSetOf<String>()
 
     /**
      * Transmit a compact acoustic beacon over the device speaker.
-     * Enforces a 10-second rate-limiting cooldown.
+     * Enforces rate-limiting cooldown (6s) between transmissions.
      */
     fun transmit(beacon: String): Boolean {
         val now = System.currentTimeMillis()
@@ -46,11 +44,12 @@ class AcousticTransport(private val context: Context) {
         }
 
         lastTransmitTimeMs = now
-        Log.d(TAG, "Transmitting acoustic beacon: $beacon")
+        val cleanBeacon = beacon.uppercase().trim()
+        Log.d(TAG, "🔊 Transmitting acoustic beacon: $cleanBeacon")
 
         scope.launch(Dispatchers.IO) {
             try {
-                playFskBeaconAudio(beacon)
+                playMfskBeaconAudio(cleanBeacon)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to play acoustic beacon", e)
             }
@@ -73,7 +72,7 @@ class AcousticTransport(private val context: Context) {
         }
 
         this.onBeaconCallback = onBeaconReceived
-        Log.d(TAG, "Starting acoustic beacon listening engine...")
+        Log.d(TAG, "Starting voice-band acoustic listening engine...")
 
         listeningJob = scope.launch(Dispatchers.IO) {
             runAudioListeningLoop()
@@ -86,7 +85,7 @@ class AcousticTransport(private val context: Context) {
     fun stopListening() {
         if (!isListeningActive.getAndSet(false)) return
 
-        Log.d(TAG, "Stopping acoustic beacon listening engine...")
+        Log.d(TAG, "Stopping acoustic listening engine...")
         listeningJob?.cancel()
         listeningJob = null
     }
@@ -94,9 +93,9 @@ class AcousticTransport(private val context: Context) {
     fun isListening(): Boolean = isListeningActive.get()
 
     /**
-     * Synthesizes and plays FSK audio tones via AudioTrack.
+     * Plays MFSK audio tones in the resonant voice band (1150 Hz - 2450 Hz) at full volume.
      */
-    private fun playFskBeaconAudio(text: String) {
+    private fun playMfskBeaconAudio(text: String) {
         val sampleRate = SAMPLE_RATE
         val charDuration = CHAR_DURATION_SEC
         val preambleDuration = PREAMBLE_DURATION_SEC
@@ -105,34 +104,35 @@ class AcousticTransport(private val context: Context) {
         val audioData = ShortArray(totalSamples)
         var sampleIdx = 0
 
-        // 1. Preamble Tone (1800 Hz)
+        // 1. Preamble Burst (1150 Hz - Lead Tone)
         val preambleSamples = (sampleRate * preambleDuration).toInt()
         for (i in 0 until preambleSamples) {
             val t = i.toDouble() / sampleRate
-            val sample = (0.85 * sin(2.0 * PI * PREAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
+            val window = 0.5 * (1.0 - cos((2.0 * PI * i) / preambleSamples))
+            val sample = (0.95 * window * sin(2.0 * PI * PREAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
             if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
         }
 
-        // 2. Data Characters (FSK: base + (char - 32) * step)
+        // 2. Data Characters MFSK Tones
         for (c in text) {
-            val charCode = c.code.coerceIn(32, 126)
-            val freq = BASE_DATA_FREQ + ((charCode - 32) * FREQ_STEP)
+            val freq = charToFrequency(c)
             val charSamples = (sampleRate * charDuration).toInt()
 
             for (i in 0 until charSamples) {
                 val t = i.toDouble() / sampleRate
-                // Hann window to prevent clicks
+                // Smooth Hann envelope on each symbol to eliminate spectral splatter
                 val window = 0.5 * (1.0 - cos((2.0 * PI * i) / charSamples))
-                val sample = (0.85 * window * sin(2.0 * PI * freq * t) * Short.MAX_VALUE).toInt().toShort()
+                val sample = (0.95 * window * sin(2.0 * PI * freq * t) * Short.MAX_VALUE).toInt().toShort()
                 if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
             }
         }
 
-        // 3. Postamble Tone (2200 Hz)
+        // 3. Postamble Burst (2450 Hz - Tail Tone)
         val postambleSamples = (sampleRate * preambleDuration).toInt()
         for (i in 0 until postambleSamples) {
             val t = i.toDouble() / sampleRate
-            val sample = (0.85 * sin(2.0 * PI * POSTAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
+            val window = 0.5 * (1.0 - cos((2.0 * PI * i) / postambleSamples))
+            val sample = (0.95 * window * sin(2.0 * PI * POSTAMBLE_FREQ * t) * Short.MAX_VALUE).toInt().toShort()
             if (sampleIdx < audioData.size) audioData[sampleIdx++] = sample
         }
 
@@ -166,7 +166,7 @@ class AcousticTransport(private val context: Context) {
             audioTrack.play()
             Thread.sleep(((totalSamples.toDouble() / sampleRate) * 1000).toLong() + 100)
         } catch (e: Exception) {
-            Log.e(TAG, "AudioTrack error", e)
+            Log.e(TAG, "AudioTrack playback error", e)
         } finally {
             try {
                 audioTrack.stop()
@@ -176,14 +176,15 @@ class AcousticTransport(private val context: Context) {
     }
 
     /**
-     * Continuous audio capture and FSK frequency analysis loop.
+     * Continuous audio capture and Goertzel Demodulator loop.
      */
     @Suppress("MissingPermission")
     private fun runAudioListeningLoop() {
         val sampleRate = SAMPLE_RATE
+        val frameSamples = (sampleRate * 0.050).toInt() // 50ms processing slices
         val bufferSize = maxOf(
             AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT),
-            sampleRate / 10 // ~100ms frames
+            frameSamples * 2
         )
 
         var audioRecord: AudioRecord? = null
@@ -193,71 +194,73 @@ class AcousticTransport(private val context: Context) {
                 sampleRate,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize * 2
+                bufferSize * 4
             )
 
             if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord initialization failed")
+                Log.e(TAG, "AudioRecord failed to initialize")
                 isListeningActive.set(false)
                 return
             }
 
             audioRecord.startRecording()
-            Log.d(TAG, "AudioRecord started successfully at ${sampleRate}Hz")
+            Log.d(TAG, "Voice-band acoustic listener online (${sampleRate}Hz)")
 
-            val audioBuffer = ShortArray(bufferSize)
-            val decodedChars = StringBuilder()
-            var isDecodingMessage = false
-            var silenceFrames = 0
+            val audioBuffer = ShortArray(frameSamples)
+            val decodedBuilder = StringBuilder()
+            var isDecoding = false
+            var lastDecodedChar: Char? = null
+            var silenceCount = 0
 
             while (isListeningActive.get()) {
                 val readCount = audioRecord.read(audioBuffer, 0, audioBuffer.size)
-                if (readCount <= 0) continue
+                if (readCount < frameSamples) continue
 
-                val dominantFreq = computeDominantFrequency(audioBuffer, readCount, sampleRate)
+                val detectedChar = detectSymbolInFrame(audioBuffer, readCount, sampleRate)
 
-                // Detect Preamble (1800 Hz ± 40 Hz)
-                if (!isDecodingMessage && abs(dominantFreq - PREAMBLE_FREQ) < 40) {
-                    isDecodingMessage = true
-                    decodedChars.clear()
-                    silenceFrames = 0
-                    Log.d(TAG, "Detected acoustic preamble tone!")
+                // 1. Preamble Detection (1150 Hz)
+                if (!isDecoding && detectedChar == PREAMBLE_MARKER) {
+                    isDecoding = true
+                    decodedBuilder.clear()
+                    lastDecodedChar = null
+                    silenceCount = 0
+                    Log.d(TAG, "Detected acoustic preamble marker!")
                     continue
                 }
 
-                // Detect Postamble (2200 Hz ± 40 Hz) or Silence End
-                if (isDecodingMessage && abs(dominantFreq - POSTAMBLE_FREQ) < 40) {
-                    finalizeDecodedMessage(decodedChars.toString())
-                    isDecodingMessage = false
-                    decodedChars.clear()
+                // 2. Postamble Detection (2450 Hz)
+                if (isDecoding && detectedChar == POSTAMBLE_MARKER) {
+                    finalizeDecodedMessage(decodedBuilder.toString())
+                    isDecoding = false
+                    decodedBuilder.clear()
+                    lastDecodedChar = null
                     continue
                 }
 
-                if (isDecodingMessage) {
-                    if (dominantFreq >= BASE_DATA_FREQ - 25 && dominantFreq <= BASE_DATA_FREQ + (95 * FREQ_STEP) + 25) {
-                        val charOffset = ((dominantFreq - BASE_DATA_FREQ + (FREQ_STEP / 2)) / FREQ_STEP).toInt()
-                        val charCode = (charOffset + 32).coerceIn(32, 126)
-                        val c = charCode.toChar()
-
-                        // Prevent duplicate consecutive same-frame reads
-                        if (decodedChars.isEmpty() || decodedChars.last() != c) {
-                            decodedChars.append(c)
+                // 3. Data Characters
+                if (isDecoding) {
+                    if (detectedChar != null && detectedChar != PREAMBLE_MARKER && detectedChar != POSTAMBLE_MARKER) {
+                        if (detectedChar != lastDecodedChar) {
+                            decodedBuilder.append(detectedChar)
+                            lastDecodedChar = detectedChar
+                            Log.d(TAG, "Acoustic RX symbol: $detectedChar (Buffer: $decodedBuilder)")
                         }
-                        silenceFrames = 0
+                        silenceCount = 0
                     } else {
-                        silenceFrames++
-                        if (silenceFrames > 15) { // Timeout after ~1.5s of no valid FSK tone
-                            if (decodedChars.length >= 10) {
-                                finalizeDecodedMessage(decodedChars.toString())
+                        silenceCount++
+                        if (silenceCount > 25) { // Timeout after ~1.25s of no symbol
+                            if (decodedBuilder.length >= 8) {
+                                finalizeDecodedMessage(decodedBuilder.toString())
                             }
-                            isDecodingMessage = false
-                            decodedChars.clear()
+                            isDecoding = false
+                            decodedBuilder.clear()
+                            lastDecodedChar = null
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in audio listening loop", e)
+            Log.e(TAG, "Acoustic listener loop exception", e)
         } finally {
             try {
                 audioRecord?.stop()
@@ -268,7 +271,7 @@ class AcousticTransport(private val context: Context) {
     }
 
     private fun finalizeDecodedMessage(raw: String) {
-        val trimmed = raw.trim()
+        val trimmed = raw.trim().uppercase()
         val payload = AcousticBeacon.parseBeacon(trimmed) ?: return
 
         synchronized(recentlyReceivedBeacons) {
@@ -286,29 +289,36 @@ class AcousticTransport(private val context: Context) {
     }
 
     /**
-     * Efficient Goertzel-based frequency detection across candidate FSK tone bands.
+     * Uses Goertzel filters with SNR peak-to-average validation to identify candidate tone.
      */
-    private fun computeDominantFrequency(buffer: ShortArray, length: Int, sampleRate: Int): Double {
-        val targetFreqs = mutableListOf<Double>()
-        targetFreqs.add(PREAMBLE_FREQ)
-        targetFreqs.add(POSTAMBLE_FREQ)
-        for (c in 32..126) {
-            targetFreqs.add(BASE_DATA_FREQ + ((c - 32) * FREQ_STEP))
-        }
-
+    private fun detectSymbolInFrame(buffer: ShortArray, length: Int, sampleRate: Int): Char? {
+        val energies = DoubleArray(ALL_SYMBOLS.size)
+        var totalEnergy = 0.0
         var maxEnergy = 0.0
-        var bestFreq = 0.0
+        var bestIdx = -1
 
-        for (targetFreq in targetFreqs) {
-            val energy = calculateGoertzelEnergy(buffer, length, sampleRate, targetFreq)
-            if (energy > maxEnergy) {
-                maxEnergy = energy
-                bestFreq = targetFreq
+        for (i in ALL_SYMBOLS.indices) {
+            val freq = ALL_FREQS[i]
+            val e = calculateGoertzelEnergy(buffer, length, sampleRate, freq)
+            energies[i] = e
+            totalEnergy += e
+            if (e > maxEnergy) {
+                maxEnergy = e
+                bestIdx = i
             }
         }
 
-        // Noise floor threshold
-        return if (maxEnergy > 1e7) bestFreq else 0.0
+        if (bestIdx == -1) return null
+
+        val meanNoise = (totalEnergy - maxEnergy) / (ALL_SYMBOLS.size - 1)
+        val snrRatio = if (meanNoise > 0) maxEnergy / meanNoise else 0.0
+
+        // Requires SNR peak at least 3.0x higher than surrounding noise floor
+        return if (snrRatio >= 3.0 && maxEnergy > 5e5) {
+            ALL_SYMBOLS[bestIdx]
+        } else {
+            null
+        }
     }
 
     private fun calculateGoertzelEnergy(buffer: ShortArray, length: Int, sampleRate: Int, targetFreq: Double): Double {
@@ -331,14 +341,53 @@ class AcousticTransport(private val context: Context) {
 
     companion object {
         const val SAMPLE_RATE = 44100
-        const val PREAMBLE_FREQ = 1800.0
-        const val POSTAMBLE_FREQ = 2200.0
-        const val BASE_DATA_FREQ = 2400.0
-        const val FREQ_STEP = 50.0 // 50 Hz spacing per ASCII symbol
 
-        const val CHAR_DURATION_SEC = 0.080 // 80ms per symbol
-        const val PREAMBLE_DURATION_SEC = 0.150 // 150ms preamble
+        // Voice band frequency allocation (1150 Hz to 2450 Hz)
+        const val PREAMBLE_FREQ = 1150.0
+        const val POSTAMBLE_FREQ = 2450.0
+        const val BASE_DATA_FREQ = 1300.0
+        const val FREQ_STEP = 30.0
 
-        const val COOLDOWN_MS = 10000L // 10s cooldown rate-limiting
+        const val CHAR_DURATION_SEC = 0.090     // 90ms per symbol
+        const val PREAMBLE_DURATION_SEC = 0.180 // 180ms preamble
+        const val COOLDOWN_MS = 6000L           // 6s cooldown rate-limiting
+
+        const val PREAMBLE_MARKER = '^'
+        const val POSTAMBLE_MARKER = '$'
+
+        val ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ|"
+        val ALL_SYMBOLS: List<Char>
+        val ALL_FREQS: DoubleArray
+
+        init {
+            val syms = mutableListOf<Char>()
+            val freqs = mutableListOf<Double>()
+
+            // 0. Preamble
+            syms.add(PREAMBLE_MARKER)
+            freqs.add(PREAMBLE_FREQ)
+
+            // 1..N. Data Symbols
+            for (i in ALPHABET.indices) {
+                syms.add(ALPHABET[i])
+                freqs.add(BASE_DATA_FREQ + (i * FREQ_STEP))
+            }
+
+            // N+1. Postamble
+            syms.add(POSTAMBLE_MARKER)
+            freqs.add(POSTAMBLE_FREQ)
+
+            ALL_SYMBOLS = syms
+            ALL_FREQS = freqs.toDoubleArray()
+        }
+
+        fun charToFrequency(c: Char): Double {
+            val idx = ALPHABET.indexOf(c.uppercaseChar())
+            return if (idx >= 0) {
+                BASE_DATA_FREQ + (idx * FREQ_STEP)
+            } else {
+                BASE_DATA_FREQ
+            }
+        }
     }
 }

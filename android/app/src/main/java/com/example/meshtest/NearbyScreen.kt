@@ -87,9 +87,11 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     var longitude by remember { mutableStateOf<Double?>(null) }
     var locTimestamp by remember { mutableStateOf<Long?>(null) }
 
-    // Acquire real device GPS location
+    // Acquire real device GPS location continuously
     LaunchedEffect(permissionsGranted) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
             == PackageManager.PERMISSION_GRANTED
         ) {
             try {
@@ -102,24 +104,27 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                     latitude = lastLoc.latitude
                     longitude = lastLoc.longitude
                     locTimestamp = lastLoc.time
-                    Log.d(TAG, "📍 LAST-KNOWN LOCATION: lat=${lastLoc.latitude}, lng=${lastLoc.longitude}")
+                    Log.d(TAG, "📍 INITIAL LOCATION: lat=${lastLoc.latitude}, lng=${lastLoc.longitude}")
                 }
-                // Request a fresh high-accuracy fix
+                // Request continuous fresh location updates
                 val locationListener = android.location.LocationListener { l ->
                     latitude = l.latitude
                     longitude = l.longitude
                     locTimestamp = l.time
-                    Log.d(TAG, "📍 FRESH LOCATION FIX: lat=${l.latitude}, lng=${l.longitude}, accuracy=${l.accuracy}m")
+                    Log.d(TAG, "📍 ACCURATE GPS FIX: lat=${l.latitude}, lng=${l.longitude}, accuracy=${l.accuracy}m")
                 }
-                @Suppress("DEPRECATION")
-                try { lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
-                @Suppress("DEPRECATION")
-                try { lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
+
+                if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 1.0f, locationListener, Looper.getMainLooper())
+                }
+                if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 1.0f, locationListener, Looper.getMainLooper())
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Location acquisition failed", e)
             }
         } else {
-            Log.w(TAG, "ACCESS_FINE_LOCATION permission not granted — location will be unavailable")
+            Log.w(TAG, "Location permission not granted — location will be unavailable")
         }
     }
 
@@ -406,9 +411,20 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                                 onSuccess = { res -> addLog("✅ Cloud Ingest (Acoustic): $res") },
                                 onError = { err -> addLog("❌ Cloud Ingest Error (Acoustic): $err") }
                             )
-                        } else {
+                        } else if (connectedEndpoints.isNotEmpty()) {
                             // Forward over BLE mesh to other peers if connected
+                            addLog("📡 BLE RELAY: Bridging acoustic SOS over BLE mesh to ${connectedEndpoints.size} peer(s)...")
                             broadcastPacketToPeers(partialSos)
+                        } else {
+                            // Device B is ALSO completely offline (No Internet & No BLE) -> Acoustic Re-Chirp Relay!
+                            addLog("🔊 [ACOUSTIC RELAY] No BLE/Internet — Re-chirping acoustic beacon to propagate...")
+                            coroutineScope.launch {
+                                kotlinx.coroutines.delay(2000L) // 2s jitter delay to prevent sound collision
+                                val sent = acousticTransport.transmit(rawBeacon)
+                                if (sent) {
+                                    addLog("🔊 [ACOUSTIC RELAY] Re-chirped sound beacon: $rawBeacon")
+                                }
+                            }
                         }
                     } else {
                         addLog("🛡️ Dropped duplicate acoustic beacon ${payload.id} (Loop Prevented)")
