@@ -77,7 +77,7 @@ In major disasters (floods, earthquakes, cyclones), cellular towers and internet
 cd server && npm install && npm start
 cd dashboard && npm install && npm run dev
 ```
-Open **`https://jeangrey.onrender.com`** in your browser.
+Open **`https://jeangrey.vercel.app/`** in your browser.
 
 ### 2. Run Android App
 1. Open the `android/` directory in **Android Studio**.
