@@ -32,6 +32,12 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+import com.example.meshtest.battery.BatteryMonitor
+import com.example.meshtest.acoustic.AcousticBeacon
+import com.example.meshtest.acoustic.AcousticTransport
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+
 private const val TAG = "ResQMesh"
 private const val SERVICE_ID = "com.example.meshtest.sos"
 
@@ -49,6 +55,16 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
+    val batteryMonitor = remember { BatteryMonitor(context) }
+    val acousticTransport = remember { AcousticTransport(context) }
+
+    val isAcousticFallbackTriggered by batteryMonitor.shouldTriggerAcoustic.collectAsState()
+    val currentBatteryPct by batteryMonitor.batteryPercentage.collectAsState()
+    val isPowerSaveMode by batteryMonitor.isPowerSaveMode.collectAsState()
+    var forceAcousticTestMode by remember { mutableStateOf(false) }
+
+    val isAcousticActive = isAcousticFallbackTriggered || forceAcousticTestMode
+
     // State
     var isMeshActive by remember { mutableStateOf(false) }
     var serverUrl by remember { mutableStateOf(DEFAULT_SERVER_URL) }
@@ -57,14 +73,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectingEndpoints = remember { mutableStateSetOf<String>() }
     val terminalLogs = remember { mutableStateListOf<String>() }
 
-    fun getBatteryPercentage(): Int {
-        return try {
-            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-            bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 85
-        } catch (e: Exception) {
-            85
-        }
-    }
+    fun getBatteryPercentage(): Int = currentBatteryPct
 
     fun addLog(msg: String) {
         val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
@@ -267,10 +276,78 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         }
 
         broadcastPacketToPeers(sos)
+
+        // Simultaneous Acoustic Fallback Broadcast if active
+        if (isAcousticActive) {
+            val beaconStr = AcousticBeacon.fromSosPacket(sos)
+            val sent = acousticTransport.transmit(beaconStr)
+            if (sent) {
+                addLog("🔊 [ACOUSTIC TX] Emitted sound beacon: $beaconStr")
+            } else {
+                addLog("⏳ [ACOUSTIC TX] Beacon rate-limited (10s cooldown)")
+            }
+        }
+    }
+
+    // Acoustic Fallback Background Listening & Automatic Ingestion Lifecycle
+    LaunchedEffect(isAcousticActive, permissionsGranted) {
+        if (isAcousticActive && permissionsGranted) {
+            val triggerReason = when {
+                forceAcousticTestMode -> "Manual Test Mode"
+                isPowerSaveMode -> "Power Saver Active"
+                currentBatteryPct <= 15 -> "Low Battery (<=15%)"
+                else -> "Active"
+            }
+            addLog("🔊 [ACOUSTIC ACTIVE] Fallback tier engaged ($triggerReason) — Mic listening...")
+
+            acousticTransport.startListening { rawBeacon ->
+                val payload = AcousticBeacon.parseBeacon(rawBeacon)
+                if (payload != null) {
+                    addLog("🔊 RX ACOUSTIC BEACON: ID=${payload.id} | Sev=${payload.severityCode} | Geohash=${payload.geohash}")
+
+                    // Deduplicate against seen IDs in MeshRouter
+                    val dedupId = "ACOUSTIC-${payload.id}"
+                    val isNew = if (!meshRouter.isMessageSeen(dedupId) && !meshRouter.isMessageSeen(payload.id)) {
+                        meshRouter.registerMessageId(dedupId)
+                        meshRouter.registerMessageId(payload.id)
+                        true
+                    } else {
+                        false
+                    }
+
+                    if (isNew) {
+                        val partialSos = AcousticBeacon.toPartialSosPacket(payload, localDeviceName)
+                        val hasInternet = isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)
+                        if (hasInternet) {
+                            addLog("🌐 ACOUSTIC GATEWAY: Offloading acoustic SOS to cloud...")
+                            GatewayUploader.uploadSos(
+                                serverBaseUrl = serverUrl,
+                                packet = partialSos,
+                                onSuccess = { res -> addLog("✅ Cloud Ingest (Acoustic): $res") },
+                                onError = { err -> addLog("❌ Cloud Ingest Error (Acoustic): $err") }
+                            )
+                        } else {
+                            // Forward over BLE mesh to other peers if connected
+                            broadcastPacketToPeers(partialSos)
+                        }
+                    } else {
+                        addLog("🛡️ Dropped duplicate acoustic beacon ${payload.id} (Loop Prevented)")
+                    }
+                }
+            }
+        } else {
+            if (acousticTransport.isListening()) {
+                acousticTransport.stopListening()
+                addLog("🔇 [ACOUSTIC STANDBY] Sound fallback tier idle")
+            }
+        }
     }
 
     DisposableEffect(Unit) {
+        batteryMonitor.startMonitoring()
         onDispose {
+            batteryMonitor.stopMonitoring()
+            acousticTransport.stopListening()
             connectionsClient.stopAdvertising()
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
@@ -309,28 +386,47 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isMeshActive) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
-                    border = BorderStroke(1.dp, if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Column(horizontalAlignment = Alignment.End) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isMeshActive) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isMeshActive) "MESH ON" else "OFFLINE",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isAcousticActive) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF64748B).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (isAcousticActive) Color(0xFFF59E0B) else Color(0xFF64748B))
+                    ) {
                         Text(
-                            text = if (isMeshActive) "MESH ON" else "OFFLINE",
-                            fontSize = 11.sp,
+                            text = if (isAcousticActive) "🔊 ACOUSTIC ACTIVE" else "🔇 ACOUSTIC IDLE",
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444)
+                            color = if (isAcousticActive) Color(0xFFF59E0B) else Color(0xFF94A3B8),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -387,7 +483,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Node Status Info Card
+            // Node Status & Acoustic Fallback Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -400,6 +496,23 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                     ) {
                         Text("Node: $localDeviceName", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         Text("Peers: ${connectedEndpoints.size}", fontSize = 12.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚡ Battery Level", fontSize = 11.sp, color = Color(0xFF94A3B8))
+                        Text(
+                            text = "$currentBatteryPct% ${if (isPowerSaveMode) "(Power Saver)" else ""}",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = if (currentBatteryPct <= 15 || isPowerSaveMode) Color(0xFFF59E0B) else Color(0xFF10B981)
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -420,6 +533,42 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = Color(0xFF38BDF8)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = Color(0xFF334155))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Force Acoustic Fallback Test Mode Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🔊 Force Acoustic Test Mode",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Chirp & listen without draining battery",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+
+                        Switch(
+                            checked = forceAcousticTestMode,
+                            onCheckedChange = { forceAcousticTestMode = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFFF59E0B),
+                                uncheckedThumbColor = Color(0xFF94A3B8),
+                                uncheckedTrackColor = Color(0xFF334155)
+                            )
                         )
                     }
                 }

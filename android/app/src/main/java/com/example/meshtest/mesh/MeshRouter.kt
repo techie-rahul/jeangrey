@@ -88,6 +88,18 @@ class MeshRouter(private val localDeviceName: String) {
         }
     }
 
+    fun isMessageSeen(messageId: String): Boolean {
+        return synchronized(seenMessageIds) {
+            seenMessageIds.contains(messageId)
+        }
+    }
+
+    fun registerMessageId(messageId: String) {
+        synchronized(seenMessageIds) {
+            seenMessageIds.add(messageId)
+        }
+    }
+
     fun clearCache() {
         synchronized(seenMessageIds) {
             seenMessageIds.clear()

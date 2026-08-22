@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ResQMesh Acoustic Bridge</title>
+</head>
+<body>
+    <script>
+        // ResQMesh Sound-based Acoustic Fallback Bridge (ggwave protocol)
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Transmit FSK Chirp
+        window.transmitAcousticBeacon = function(beaconText) {
+            try {
+                initAudio();
+                const sampleRate = audioCtx.sampleRate;
+                const charDuration = 0.08; // 80ms per character
+                const preambleFreq = 1800; // Preamble start marker
+                const baseFreq = 2000;     // Base frequency in Hz
+                const freqStep = 50;       // 50Hz per ASCII character offset
+
+                const totalDuration = 0.15 + (beaconText.length * charDuration) + 0.15;
+                const buffer = audioCtx.createBuffer(1, Math.floor(sampleRate * totalDuration), sampleRate);
+                const channelData = buffer.getChannelData(0);
+
+                let sampleIdx = 0;
+
+                // 1. Preamble Tone
+                const preambleSamples = Math.floor(sampleRate * 0.15);
+                for (let i = 0; i < preambleSamples; i++) {
+                    const t = i / sampleRate;
+                    channelData[sampleIdx++] = 0.4 * Math.sin(2 * Math.PI * preambleFreq * t);
+                }
+
+                // 2. Data FSK Tones
+                for (let c = 0; c < beaconText.length; c++) {
+                    const charCode = beaconText.charCodeAt(c);
+                    const freq = baseFreq + ((charCode - 32) * freqStep);
+                    const numSamples = Math.floor(sampleRate * charDuration);
+
+                    for (let i = 0; i < numSamples; i++) {
+                        const t = i / sampleRate;
+                        // Hann window to prevent spectral splatter / clicks
+                        const window = 0.5 * (1 - Math.cos((2 * Math.PI * i) / numSamples));
+                        channelData[sampleIdx++] = 0.4 * window * Math.sin(2 * Math.PI * freq * t);
+                    }
+                }
+
+                // 3. Postamble Tone
+                const postambleSamples = Math.floor(sampleRate * 0.15);
+                for (let i = 0; i < postambleSamples; i++) {
+                    const t = i / sampleRate;
+                    channelData[sampleIdx++] = 0.4 * Math.sin(2 * Math.PI * (preambleFreq + 400) * t);
+                }
+
+                const source = audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(audioCtx.destination);
+                source.start();
+
+                if (window.AndroidBridge) {
+                    window.AndroidBridge.onTransmitComplete(true, beaconText);
+                }
+            } catch (err) {
+                if (window.AndroidBridge) {
+                    window.AndroidBridge.onTransmitComplete(false, err.toString());
+                }
+            }
+        };
+
+        window.onload = function() {
+            if (window.AndroidBridge) {
+                window.AndroidBridge.onBridgeReady();
+            }
+        };
+    </script>
+</body>
+</html>

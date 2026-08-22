@@ -55,6 +55,9 @@ class MainActivity : ComponentActivity() {
         needed.add(Manifest.permission.ACCESS_FINE_LOCATION)
         needed.add(Manifest.permission.ACCESS_COARSE_LOCATION)
 
+        // Microphone permission needed for acoustic sound-based beacon fallback
+        needed.add(Manifest.permission.RECORD_AUDIO)
+
         val notGranted = needed.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
