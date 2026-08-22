@@ -2,14 +2,18 @@ package com.example.meshtest
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,6 +30,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.meshtest.mesh.MeshDecision
 import com.example.meshtest.mesh.MeshRouter
 import com.example.meshtest.model.EmergencyType
@@ -35,6 +39,7 @@ import com.example.meshtest.model.SosPriority
 import com.example.meshtest.model.SosPriorityCalculator
 import com.example.meshtest.model.SosPriorityQueue
 import com.example.meshtest.network.GatewayUploader
+import com.example.meshtest.ui.theme.*
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 import kotlinx.coroutines.launch
@@ -47,6 +52,13 @@ private const val SERVICE_ID = "com.example.meshtest.sos"
 // Verified Active Fresh Public Cloud Gateway Endpoint
 private const val DEFAULT_SERVER_URL = "https://jeangrey.onrender.com"
 
+enum class NavigationTab {
+    DASHBOARD,
+    ALERTS,
+    MAP,
+    SETTINGS
+}
+
 @Composable
 fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectionsClient = remember { Nearby.getConnectionsClient(context) }
@@ -58,7 +70,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    // State
+    // ── Connectivity & App State ────────────────────────────────────────
     var isMeshActive by remember { mutableStateOf(false) }
     var serverUrl by remember { mutableStateOf(DEFAULT_SERVER_URL) }
     var isGatewayModeEnabled by remember { mutableStateOf(true) }
@@ -70,6 +82,11 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
     var locTimestamp by remember { mutableStateOf<Long?>(null) }
+
+    // Navigation and Modal UI State
+    var selectedTab by remember { mutableStateOf(NavigationTab.DASHBOARD) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var showAllQueueItems by remember { mutableStateOf(false) }
 
     // Acquire real device GPS location
     LaunchedEffect(permissionsGranted) {
@@ -160,7 +177,6 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     }
 
     // --- Callbacks ---
-
     val payloadCallback = remember {
         object : PayloadCallback() {
             override fun onPayloadReceived(endpointId: String, payload: Payload) {
@@ -248,7 +264,6 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         object : EndpointDiscoveryCallback() {
             override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
                 Log.d(TAG, "Found endpoint: ${info.endpointName} ($endpointId)")
-                
                 val shouldInitiate = localDeviceName < info.endpointName
 
                 if (shouldInitiate && !connectedEndpoints.containsKey(endpointId) && !connectingEndpoints.contains(endpointId)) {
@@ -349,6 +364,23 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         broadcastPacketToPeers(sos)
     }
 
+    fun openInGoogleMaps() {
+        val lat = latitude
+        val lng = longitude
+        if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
+            try {
+                val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(ResQMesh+Node+$localDeviceName)")
+                val intent = Intent(Intent.ACTION_VIEW, uri)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(context, "No maps application installed", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "Location coordinates not yet acquired", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             connectionsClient.stopAdvertising()
@@ -357,351 +389,144 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         }
     }
 
-    // --- UI Screen ---
+    // ── REDESIGNED RESQMESH INTERFACE ──────────────────────────────────
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFF0B0F19)
+        containerColor = ResQDarkBackground,
+        bottomBar = {
+            ResQBottomNavigationBar(
+                selectedTab = selectedTab,
+                onTabSelected = { tab ->
+                    selectedTab = tab
+                    when (tab) {
+                        NavigationTab.MAP -> openInGoogleMaps()
+                        NavigationTab.SETTINGS -> showSettingsDialog = true
+                        else -> {}
+                    }
+                }
+            )
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "ResQMesh",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Offline SOS Relay Node",
-                        fontSize = 12.sp,
-                        color = Color(0xFF94A3B8)
-                    )
-                }
+            // 1. HEADER
+            ResQHeader(
+                isMeshActive = isMeshActive,
+                onSettingsClick = { showSettingsDialog = true }
+            )
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isMeshActive) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
-                    border = BorderStroke(1.dp, if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444))
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isMeshActive) "MESH ON" else "OFFLINE",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (isMeshActive) Color(0xFF10B981) else Color(0xFFEF4444)
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Big Red SOS Button
-            Button(
-                onClick = { showSituationDialog = true },
-                enabled = permissionsGranted,
+            // Main Scrollable Area
+            LazyColumn(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "🚨 SOS",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "HOLD OR TAP TO SELECT SITUATION & SEND",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Mesh Controls
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { startMesh() },
-                    enabled = permissionsGranted && !isMeshActive,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
-                ) {
-                    Text("Start Mesh")
-                }
-
-                OutlinedButton(
-                    onClick = { stopMesh() },
-                    enabled = isMeshActive,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Stop Mesh", color = Color.White)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Node Status Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Node: $localDeviceName", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text("Peers: ${connectedEndpoints.size}", fontSize = 12.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Gateway Server URL Display (Automatically Configured)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Cloud Gateway",
-                            fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = DEFAULT_SERVER_URL,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF38BDF8)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Relay Queue Visualization Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                border = BorderStroke(1.dp, Color(0xFF334155))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "RELAY QUEUE (PRIORITY ORDER)",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF94A3B8)
-                        )
-                        Text(
-                            text = "${relayQueueItems.size} in queue",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF38BDF8)
+                // When on ALERTS tab, prioritize showing the Queue & SOS controls
+                if (selectedTab == NavigationTab.DASHBOARD || selectedTab == NavigationTab.ALERTS) {
+                    // 2. SEND SOS
+                    item {
+                        ResQSosEmergencyButton(
+                            permissionsGranted = permissionsGranted,
+                            onSosClick = { showSituationDialog = true }
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    if (relayQueueItems.isEmpty()) {
-                        Text(
-                            text = "Queue empty. Broadcast or receive an SOS to see priority forwarding order.",
-                            fontSize = 10.sp,
-                            color = Color(0xFF64748B),
-                            fontFamily = FontFamily.Monospace
+                    // 3. START/STOP MESH CONTROLS
+                    item {
+                        ResQMeshControls(
+                            isMeshActive = isMeshActive,
+                            permissionsGranted = permissionsGranted,
+                            onStartMesh = { startMesh() },
+                            onStopMesh = { stopMesh() }
                         )
-                    } else {
-                        relayQueueItems.take(3).forEachIndexed { idx, item ->
-                            val priorityEnum = SosPriority.fromString(item.priority)
-                            val badgeColor = when (priorityEnum) {
-                                SosPriority.URGENT -> Color(0xFFEF4444)
-                                SosPriority.HIGH -> Color(0xFFF97316)
-                                SosPriority.MEDIUM -> Color(0xFFEAB308)
-                            }
-                            val statusLabel = if (idx == 0) "Forwarding first" else "Queued"
+                    }
+                }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = when (priorityEnum) {
-                                            SosPriority.URGENT -> "🚨"
-                                            SosPriority.HIGH -> "🟠"
-                                            SosPriority.MEDIUM -> "🟡"
-                                        },
-                                        fontSize = 13.sp
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text(
-                                            text = item.messageId,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = Color.White
-                                        )
-                                        Text(
-                                            text = "Bat: ${item.batteryLevel}% • $statusLabel",
-                                            fontSize = 10.sp,
-                                            color = Color(0xFF94A3B8)
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = badgeColor.copy(alpha = 0.2f),
-                                    border = BorderStroke(1.dp, badgeColor)
-                                ) {
-                                    Text(
-                                        text = priorityEnum.label,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = badgeColor
-                                    )
-                                }
-                            }
+                if (selectedTab == NavigationTab.DASHBOARD) {
+                    // 4 & 5. MESH STATUS & TOPOLOGY
+                    item {
+                        val hasInternet = remember(isMeshActive, isGatewayModeEnabled) {
+                            isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)
                         }
+                        ResQMeshStatusCard(
+                            isMeshActive = isMeshActive,
+                            nodeId = localDeviceName,
+                            connectedPeersCount = connectedEndpoints.size,
+                            connectedEndpoints = connectedEndpoints,
+                            hasInternet = hasInternet,
+                            serverUrl = serverUrl,
+                            recentRelayPath = relayQueueItems.firstOrNull()?.relayPath ?: emptyList()
+                        )
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            // Live Relay Terminal Log Header + Clear Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "LIVE MESH TELEMETRY LOG",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF94A3B8)
-                )
-
-                TextButton(
-                    onClick = { clearLogs() },
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                ) {
-                    Text("🧹 Clear Log", fontSize = 11.sp, color = Color(0xFF38BDF8), fontFamily = FontFamily.Monospace)
+                // 6. RELAY QUEUE (PRIORITY ORDER)
+                if (selectedTab == NavigationTab.DASHBOARD || selectedTab == NavigationTab.ALERTS) {
+                    item {
+                        ResQRelayQueueCard(
+                            queueItems = relayQueueItems,
+                            showAll = showAllQueueItems,
+                            onToggleShowAll = { showAllQueueItems = !showAllQueueItems }
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                // 7. CURRENT LOCATION
+                if (selectedTab == NavigationTab.DASHBOARD || selectedTab == NavigationTab.MAP) {
+                    item {
+                        ResQLocationCard(
+                            latitude = latitude,
+                            longitude = longitude,
+                            timestamp = locTimestamp,
+                            onOpenMaps = { openInGoogleMaps() }
+                        )
+                    }
+                }
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF020617)),
-                border = BorderStroke(1.dp, Color(0xFF1E293B))
-            ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(10.dp)
-                ) {
-                    if (terminalLogs.isEmpty()) {
-                        item {
-                            Text(
-                                text = "Mesh initialized. Tap 'Start Mesh' to connect nearby peers.",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF64748B)
-                            )
-                        }
-                    } else {
-                        items(terminalLogs.toList()) { log ->
-                            Text(
-                                text = log,
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = when {
-                                    log.contains("🚨") -> Color(0xFFF87171)
-                                    log.contains("✅") -> Color(0xFF4ADE80)
-                                    log.contains("🚀") -> Color(0xFF38BDF8)
-                                    log.contains("🛡️") -> Color(0xFFFBBF24)
-                                    else -> Color(0xFFCBD5E1)
-                                },
-                                modifier = Modifier.padding(vertical = 1.dp)
-                            )
-                        }
+                // 8. LIVE MESH ACTIVITY
+                if (selectedTab == NavigationTab.DASHBOARD) {
+                    item {
+                        ResQLiveActivityCard(
+                            logs = terminalLogs,
+                            listState = listState,
+                            onClearLogs = { clearLogs() }
+                        )
                     }
                 }
             }
         }
     }
 
-    // --- Situation Selection Dialog ---
+    // ── Situation Selection Modal ──────────────────────────────────────
     if (showSituationDialog) {
         AlertDialog(
             onDismissRequest = { showSituationDialog = false },
-            containerColor = Color(0xFF1E293B),
+            containerColor = ResQDarkCard,
+            shape = RoundedCornerShape(16.dp),
             title = {
-                Text(
-                    text = "WHAT'S HAPPENING?",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🚨", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SELECT EMERGENCY TYPE",
+                        style = Typography.titleMedium,
+                        color = ResQTextPrimary
+                    )
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Select your current emergency situation:",
-                        fontSize = 13.sp,
-                        color = Color(0xFF94A3B8)
+                        text = "Choose your situation to broadcast with appropriate priority:",
+                        style = Typography.bodyMedium,
+                        color = ResQTextSecondary
                     )
 
                     // Option 1: Lost / Need Assistance
@@ -711,8 +536,8 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             triggerPrioritySos(EmergencyType.LOST_ASSISTANCE)
                         },
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0F172A),
-                        border = BorderStroke(1.dp, Color(0xFFEAB308).copy(alpha = 0.6f)),
+                        color = ResQDarkCardSubtle,
+                        border = BorderStroke(1.dp, ResQYellow.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -724,14 +549,13 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             Column {
                                 Text(
                                     text = "I'm lost / need assistance",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    style = Typography.titleMedium,
+                                    color = ResQTextPrimary
                                 )
                                 Text(
-                                    text = "Non-life-threatening assistance",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF94A3B8)
+                                    text = "Non-life-threatening assistance (Medium Priority)",
+                                    style = Typography.bodyMedium,
+                                    color = ResQTextSecondary
                                 )
                             }
                         }
@@ -744,8 +568,8 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             triggerPrioritySos(EmergencyType.EMERGENCY)
                         },
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0F172A),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.6f)),
+                        color = ResQDarkCardSubtle,
+                        border = BorderStroke(1.dp, ResQRedBright.copy(alpha = 0.6f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -756,15 +580,14 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "I'm in an emergency",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    text = "Critical Emergency",
+                                    style = Typography.titleMedium,
+                                    color = ResQRedBright
                                 )
                                 Text(
-                                    text = "Critical danger / medical urgent",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF94A3B8)
+                                    text = "Immediate medical / evacuation (High/Urgent)",
+                                    style = Typography.bodyMedium,
+                                    color = ResQTextSecondary
                                 )
                             }
                         }
@@ -774,40 +597,44 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showSituationDialog = false }) {
-                    Text("Cancel", color = Color(0xFF94A3B8))
+                    Text("Cancel", color = ResQTextSecondary)
                 }
             }
         )
     }
 
-    // --- SOS Confirmation / Result Dialog ---
+    // ── SOS Confirmation Dialog ────────────────────────────────────────
     createdSosInfo?.let { (msgId, priority, battery) ->
         val badgeColor = when (priority) {
-            SosPriority.URGENT -> Color(0xFFEF4444)
-            SosPriority.HIGH -> Color(0xFFF97316)
-            SosPriority.MEDIUM -> Color(0xFFEAB308)
+            SosPriority.URGENT -> ResQRedBright
+            SosPriority.HIGH -> ResQOrange
+            SosPriority.MEDIUM -> ResQYellow
         }
 
         AlertDialog(
             onDismissRequest = { createdSosInfo = null },
-            containerColor = Color(0xFF1E293B),
+            containerColor = ResQDarkCard,
+            shape = RoundedCornerShape(16.dp),
             title = {
-                Text(
-                    text = "SOS CREATED",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("✅", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SOS BROADCAST INITIATED",
+                        style = Typography.titleMedium,
+                        color = ResQTextPrimary
+                    )
+                }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("SOS ID:", fontSize = 13.sp, color = Color(0xFF94A3B8))
-                        Text(msgId, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("SOS ID:", style = Typography.bodyMedium)
+                        Text(msgId, style = Typography.labelMedium, color = ResQTextPrimary)
                     }
 
                     Row(
@@ -815,7 +642,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Priority:", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                        Text("Priority Rank:", style = Typography.bodyMedium)
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = badgeColor.copy(alpha = 0.2f),
@@ -824,8 +651,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                             Text(
                                 text = priority.label,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
+                                style = Typography.labelMedium,
                                 color = badgeColor
                             )
                         }
@@ -836,28 +662,840 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Battery Level:", fontSize = 13.sp, color = Color(0xFF94A3B8))
-                        Text("$battery%", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Battery Level:", style = Typography.bodyMedium)
+                        Text("$battery%", style = Typography.labelMedium, color = ResQTextPrimary)
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Your SOS will be given priority in the relay network.",
-                        fontSize = 12.sp,
-                        color = Color(0xFF38BDF8),
-                        fontWeight = FontWeight.Medium
+                        text = "Your packet is now queued for prioritized multi-hop mesh dissemination and cloud gateway relay.",
+                        style = Typography.bodyMedium,
+                        color = ResQBlueLight
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { createdSosInfo = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                    colors = ButtonDefaults.buttonColors(containerColor = ResQBlue),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("OK")
+                    Text("Acknowledge", color = Color.White)
+                }
+            }
+        )
+    }
+
+    // ── Settings Dialog ────────────────────────────────────────────────
+    if (showSettingsDialog) {
+        var tempUrl by remember { mutableStateOf(serverUrl) }
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            containerColor = ResQDarkCard,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "SETTINGS & GATEWAY",
+                    style = Typography.titleMedium,
+                    color = ResQTextPrimary
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Local Node ID:",
+                        style = Typography.bodyMedium
+                    )
+                    Text(
+                        text = localDeviceName,
+                        style = Typography.labelMedium,
+                        color = ResQBlueLight
+                    )
+
+                    HorizontalDivider(color = ResQBorderSubtle)
+
+                    Text(
+                        text = "Cloud Gateway Backend URL:",
+                        style = Typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = tempUrl,
+                        onValueChange = { tempUrl = it },
+                        singleLine = true,
+                        textStyle = Typography.labelMedium.copy(color = ResQTextPrimary),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ResQBlueLight,
+                            unfocusedBorderColor = ResQBorder,
+                            focusedContainerColor = ResQDarkCardSubtle,
+                            unfocusedContainerColor = ResQDarkCardSubtle
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Gateway Upload Enabled", style = Typography.bodyMedium)
+                        Switch(
+                            checked = isGatewayModeEnabled,
+                            onCheckedChange = { isGatewayModeEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = ResQBlue
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        serverUrl = tempUrl.trim()
+                        showSettingsDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ResQBlue),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("Close", color = ResQTextSecondary)
                 }
             }
         )
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 1: HEADER
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQHeader(
+    isMeshActive: Boolean,
+    onSettingsClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "ResQMesh",
+                style = Typography.headlineLarge,
+                color = ResQTextPrimary
+            )
+            Text(
+                text = "Offline SOS Relay Network",
+                style = Typography.bodyMedium,
+                color = ResQTextSecondary
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Dynamic Mesh Status Badge
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isMeshActive) ResQGreenBg else ResQDarkCardSubtle,
+                border = BorderStroke(1.dp, if (isMeshActive) ResQGreen else ResQBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isMeshActive) ResQGreenBright else ResQTextMuted)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isMeshActive) "MESH ACTIVE" else "OFFLINE",
+                        style = Typography.labelMedium,
+                        color = if (isMeshActive) ResQGreenBright else ResQTextSecondary
+                    )
+                }
+            }
+
+            // Settings Icon
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = ResQDarkCardSubtle,
+                border = BorderStroke(1.dp, ResQBorderSubtle),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable { onSettingsClick() }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("⚙️", fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 2: SEND SOS BUTTON
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQSosEmergencyButton(
+    permissionsGranted: Boolean,
+    onSosClick: () -> Unit
+) {
+    Surface(
+        onClick = onSosClick,
+        enabled = permissionsGranted,
+        shape = RoundedCornerShape(16.dp),
+        color = ResQRed,
+        border = BorderStroke(1.dp, ResQRedBright),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(84.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🚨", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SEND SOS",
+                        style = Typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Tap to send • Hold for emergency",
+                    style = Typography.bodyMedium.copy(fontSize = 13.sp),
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.2f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("➔", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 3: START / STOP MESH CONTROLS
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQMeshControls(
+    isMeshActive: Boolean,
+    permissionsGranted: Boolean,
+    onStartMesh: () -> Unit,
+    onStopMesh: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Start Mesh Button
+        Button(
+            onClick = onStartMesh,
+            enabled = permissionsGranted && !isMeshActive,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = ResQBlue,
+                disabledContainerColor = ResQDarkCardSubtle,
+                disabledContentColor = ResQTextMuted
+            ),
+            border = if (!isMeshActive) BorderStroke(1.dp, ResQBlueLight) else BorderStroke(1.dp, ResQBorderSubtle)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("⚡", fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "START MESH",
+                    style = Typography.labelLarge,
+                    color = if (!isMeshActive && permissionsGranted) Color.White else ResQTextMuted
+                )
+            }
+        }
+
+        // Stop Mesh Button
+        OutlinedButton(
+            onClick = onStopMesh,
+            enabled = isMeshActive,
+            modifier = Modifier
+                .weight(1f)
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isMeshActive) ResQRedBg else ResQDarkCardSubtle,
+                contentColor = if (isMeshActive) ResQRedBright else ResQTextMuted
+            ),
+            border = BorderStroke(1.dp, if (isMeshActive) ResQRedBright.copy(alpha = 0.8f) else ResQBorderSubtle)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🛑", fontSize = 14.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "STOP MESH",
+                    style = Typography.labelLarge,
+                    color = if (isMeshActive) ResQRedBright else ResQTextMuted
+                )
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 4 & 5: MESH STATUS & TOPOLOGY CARD
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQMeshStatusCard(
+    isMeshActive: Boolean,
+    nodeId: String,
+    connectedPeersCount: Int,
+    connectedEndpoints: Map<String, String>,
+    hasInternet: Boolean,
+    serverUrl: String,
+    recentRelayPath: List<String>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ResQDarkCard),
+        border = BorderStroke(1.dp, ResQBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Card Title Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "MESH STATUS",
+                        style = Typography.labelMedium.copy(color = ResQTextSecondary)
+                    )
+                }
+
+                Text(
+                    text = if (isMeshActive) "ACTIVE RELAY" else "STANDBY",
+                    style = Typography.labelSmall.copy(
+                        color = if (isMeshActive) ResQGreenBright else ResQTextMuted
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Metadata Grid
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Node ID
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Node ID", style = Typography.bodyMedium)
+                    Text(
+                        text = nodeId,
+                        style = Typography.labelMedium,
+                        color = ResQTextPrimary
+                    )
+                }
+
+                // Connected Peers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Connected Peers", style = Typography.bodyMedium)
+                    Text(
+                        text = if (connectedPeersCount > 0) "$connectedPeersCount active" else "0 (Scanning)",
+                        style = Typography.labelMedium,
+                        color = if (connectedPeersCount > 0) ResQBlueLight else ResQTextMuted
+                    )
+                }
+
+                // Cloud Gateway
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Cloud Gateway", style = Typography.bodyMedium)
+                    Text(
+                        text = if (hasInternet) "Online (Sync Ready)" else "Offline (P2P Relay Only)",
+                        style = Typography.labelMedium,
+                        color = if (hasInternet) ResQGreenBright else ResQOrange
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = ResQBorderSubtle)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Network Topology Section
+            Text(
+                text = "NETWORK TOPOLOGY",
+                style = Typography.labelSmall.copy(color = ResQTextSecondary)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Topology Flow Visualizer
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ResQDarkCardSubtle)
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TopologyNode(label = "You", subLabel = nodeId.take(8), isActive = true)
+                Text("➔", color = ResQTextMuted, fontSize = 12.sp)
+                TopologyNode(
+                    label = "Peers",
+                    subLabel = if (connectedPeersCount > 0) "$connectedPeersCount connected" else "N/A",
+                    isActive = connectedPeersCount > 0
+                )
+                Text("➔", color = ResQTextMuted, fontSize = 12.sp)
+                TopologyNode(
+                    label = "Relays",
+                    subLabel = if (recentRelayPath.isNotEmpty()) "${recentRelayPath.size} hops" else "Mesh Ready",
+                    isActive = isMeshActive
+                )
+                Text("➔", color = ResQTextMuted, fontSize = 12.sp)
+                TopologyNode(
+                    label = "Gateway",
+                    subLabel = if (hasInternet) "Online" else "Pending",
+                    isActive = hasInternet
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopologyNode(label: String, subLabel: String, isActive: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            style = Typography.labelMedium,
+            color = if (isActive) ResQBlueLight else ResQTextMuted
+        )
+        Text(
+            text = subLabel,
+            style = Typography.labelSmall,
+            color = if (isActive) ResQTextPrimary else ResQTextMuted
+        )
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 6: RELAY QUEUE (PRIORITY ORDER) CARD
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQRelayQueueCard(
+    queueItems: List<SosPacket>,
+    showAll: Boolean,
+    onToggleShowAll: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ResQDarkCard),
+        border = BorderStroke(1.dp, ResQBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "RELAY QUEUE (PRIORITY ORDER)",
+                        style = Typography.labelMedium.copy(color = ResQTextSecondary)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = ResQDarkCardSubtle,
+                    border = BorderStroke(1.dp, ResQBorderSubtle)
+                ) {
+                    Text(
+                        text = "${queueItems.size} in queue",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = Typography.labelSmall,
+                        color = if (queueItems.isNotEmpty()) ResQBlueLight else ResQTextMuted
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (queueItems.isEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ResQDarkCardSubtle,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Queue empty. Discovered SOS emergency packets will be buffered and forwarded based on life-safety priority rank.",
+                        modifier = Modifier.padding(10.dp),
+                        style = Typography.bodyMedium.copy(fontSize = 11.sp),
+                        color = ResQTextMuted
+                    )
+                }
+            } else {
+                val displayList = if (showAll) queueItems else queueItems.take(3)
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    displayList.forEachIndexed { index, item ->
+                        val priorityEnum = SosPriority.fromString(item.priority)
+                        val badgeColor = when (priorityEnum) {
+                            SosPriority.URGENT -> ResQRedBright
+                            SosPriority.HIGH -> ResQOrange
+                            SosPriority.MEDIUM -> ResQYellow
+                        }
+                        val statusLabel = if (index == 0) "Forwarding first" else "Queued"
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ResQDarkCardSubtle,
+                            border = BorderStroke(1.dp, ResQBorderSubtle),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = when (priorityEnum) {
+                                            SosPriority.URGENT -> "🚨"
+                                            SosPriority.HIGH -> "🟠"
+                                            SosPriority.MEDIUM -> "🟡"
+                                        },
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = item.messageId,
+                                            style = Typography.labelMedium,
+                                            color = ResQTextPrimary
+                                        )
+                                        Text(
+                                            text = "Bat: ${item.batteryLevel}% • $statusLabel • Hops: ${item.hopCount}",
+                                            style = Typography.bodyMedium.copy(fontSize = 10.sp),
+                                            color = ResQTextSecondary
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = badgeColor.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, badgeColor)
+                                ) {
+                                    Text(
+                                        text = priorityEnum.label,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = Typography.labelSmall,
+                                        color = badgeColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (queueItems.size > 3) {
+                    TextButton(
+                        onClick = onToggleShowAll,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            text = if (showAll) "Show less" else "View all (${queueItems.size})",
+                            style = Typography.labelMedium,
+                            color = ResQBlueLight
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 7: CURRENT LOCATION CARD
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQLocationCard(
+    latitude: Double?,
+    longitude: Double?,
+    timestamp: Long?,
+    onOpenMaps: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ResQDarkCard),
+        border = BorderStroke(1.dp, ResQBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "CURRENT LOCATION",
+                    style = Typography.labelMedium.copy(color = ResQTextSecondary)
+                )
+
+                Text(
+                    text = if (latitude != null) "GPS Locked" else "Acquiring...",
+                    style = Typography.labelSmall.copy(
+                        color = if (latitude != null) ResQGreenBright else ResQOrange
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = ResQDarkCardSubtle,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (latitude != null && longitude != null) {
+                                String.format(Locale.US, "%.5f, %.5f", latitude, longitude)
+                            } else {
+                                "Waiting for GPS Fix..."
+                            },
+                            style = Typography.labelMedium,
+                            color = ResQTextPrimary
+                        )
+                        Text(
+                            text = if (timestamp != null) {
+                                "Fix Time: " + SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))
+                            } else {
+                                "Accuracy: Standard GPS Provider"
+                            },
+                            style = Typography.bodyMedium.copy(fontSize = 10.sp),
+                            color = ResQTextSecondary
+                        )
+                    }
+
+                    Button(
+                        onClick = onOpenMaps,
+                        enabled = latitude != null && longitude != null,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ResQBlue),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text("OPEN IN MAPS", style = Typography.labelSmall, color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 8: LIVE MESH ACTIVITY
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQLiveActivityCard(
+    logs: List<String>,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onClearLogs: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ResQDarkCard),
+        border = BorderStroke(1.dp, ResQBorder)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "LIVE MESH ACTIVITY",
+                    style = Typography.labelMedium.copy(color = ResQTextSecondary)
+                )
+
+                TextButton(
+                    onClick = onClearLogs,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text("Clear Log", style = Typography.labelSmall, color = ResQBlueLight)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = ResQDarkCardSubtle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                ) {
+                    if (logs.isEmpty()) {
+                        item {
+                            Text(
+                                text = "Mesh initialized. Tap 'Start Mesh' to connect nearby peers.",
+                                style = Typography.bodyMedium.copy(fontSize = 11.sp),
+                                color = ResQTextMuted
+                            )
+                        }
+                    } else {
+                        items(logs) { log ->
+                            Text(
+                                text = log,
+                                style = Typography.bodyMedium.copy(
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = when {
+                                    log.contains("🚨") || log.contains("❌") -> ResQRedBright
+                                    log.contains("✅") || log.contains("⚡") -> ResQGreenBright
+                                    log.contains("🚀") || log.contains("🔗") -> ResQBlueLight
+                                    log.contains("🛡️") || log.contains("⚠️") -> ResQYellow
+                                    else -> ResQTextSecondary
+                                },
+                                modifier = Modifier.padding(vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 9: BOTTOM NAVIGATION BAR
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQBottomNavigationBar(
+    selectedTab: NavigationTab,
+    onTabSelected: (NavigationTab) -> Unit
+) {
+    NavigationBar(
+        containerColor = ResQDarkSurface,
+        contentColor = ResQTextPrimary,
+        tonalElevation = 0.dp
+    ) {
+        NavigationBarItem(
+            selected = selectedTab == NavigationTab.DASHBOARD,
+            onClick = { onTabSelected(NavigationTab.DASHBOARD) },
+            icon = { Text("📡", fontSize = 16.sp) },
+            label = { Text("Dashboard", style = Typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = ResQBlueLight,
+                selectedTextColor = ResQBlueLight,
+                unselectedIconColor = ResQTextMuted,
+                unselectedTextColor = ResQTextMuted,
+                indicatorColor = ResQBlueBg
+            )
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == NavigationTab.ALERTS,
+            onClick = { onTabSelected(NavigationTab.ALERTS) },
+            icon = { Text("🚨", fontSize = 16.sp) },
+            label = { Text("Alerts", style = Typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = ResQRedBright,
+                selectedTextColor = ResQRedBright,
+                unselectedIconColor = ResQTextMuted,
+                unselectedTextColor = ResQTextMuted,
+                indicatorColor = ResQRedBg
+            )
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == NavigationTab.MAP,
+            onClick = { onTabSelected(NavigationTab.MAP) },
+            icon = { Text("🗺️", fontSize = 16.sp) },
+            label = { Text("Map", style = Typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = ResQGreenBright,
+                selectedTextColor = ResQGreenBright,
+                unselectedIconColor = ResQTextMuted,
+                unselectedTextColor = ResQTextMuted,
+                indicatorColor = ResQGreenBg
+            )
+        )
+
+        NavigationBarItem(
+            selected = selectedTab == NavigationTab.SETTINGS,
+            onClick = { onTabSelected(NavigationTab.SETTINGS) },
+            icon = { Text("⚙️", fontSize = 16.sp) },
+            label = { Text("Settings", style = Typography.labelSmall) },
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = ResQTextPrimary,
+                selectedTextColor = ResQTextPrimary,
+                unselectedIconColor = ResQTextMuted,
+                unselectedTextColor = ResQTextMuted,
+                indicatorColor = ResQDarkCard
+            )
+        )
+    }
+}
