@@ -18,12 +18,18 @@ export default function AlertCard({ alert, isSelected, onSelect, onUpdateStatus 
       {/* Top Banner */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <span className={`p-1.5 rounded-lg ${isCritical ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
-            <ShieldAlert className="w-4 h-4 animate-pulse" />
-          </span>
+          {alert.packetType === 'MESSAGE' ? (
+            <span className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center w-7 h-7">
+              💬
+            </span>
+          ) : (
+            <span className={`p-1.5 rounded-lg ${isCritical ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              <ShieldAlert className="w-4 h-4 animate-pulse" />
+            </span>
+          )}
           <div>
             <h4 className="font-mono font-bold text-sm tracking-wide text-white flex items-center gap-2">
-              {alert.messageId}
+              {alert.packetType === 'MESSAGE' ? 'Emergency Details' : alert.messageId}
               <span className={`text-[10px] font-sans px-2 py-0.5 rounded-full font-semibold border ${
                 isResolved
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
