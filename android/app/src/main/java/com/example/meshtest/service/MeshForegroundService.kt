@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -22,8 +24,12 @@ import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 
 /**
- * Foreground Service: keeps ResQMesh P2P relay alive in the background.
- * Survives screen-off (WakeLock), minimisation, and swipe-away (AlarmManager restart).
+ * Foreground Service: keeps ResQMesh P2P relay alive in background.
+ * - PARTIAL_WAKE_LOCK: survives screen-off
+ * - START_STICKY + onTaskRemoved AlarmManager: survives swipe-away
+ * - Aggressive rediscovery loop: restarts discovery every 20s to find new peers
+ * - Connects to ALL visible peers (no alphabetical ordering filter)
+ * - Retries failed connections after 5 seconds
  */
 class MeshForegroundService : Service() {
 
@@ -32,16 +38,33 @@ class MeshForegroundService : Service() {
     private val CHANNEL_ID = "resqmesh_relay_channel"
     private val SERVICE_ID = "com.example.meshtest.sos"
 
+    // Rediscovery: restart advertising+discovery every REDISCOVERY_INTERVAL_MS
+    private val REDISCOVERY_INTERVAL_MS = 20_000L   // 20 seconds
+    private val RETRY_CONNECT_DELAY_MS  = 5_000L    // retry failed conn after 5s
+
     private lateinit var connectionsClient: ConnectionsClient
     private lateinit var localDeviceName: String
     private lateinit var meshRouter: MeshRouter
     private val priorityQueue = SosPriorityQueue()
 
-    private val connectedEndpoints = mutableMapOf<String, String>()
-    private val connectingEndpoints = mutableSetOf<String>()
+    private val connectedEndpoints   = mutableMapOf<String, String>()
+    private val connectingEndpoints  = mutableSetOf<String>()
+    // Track every endpoint ever seen so we can retry them
+    private val discoveredEndpoints  = mutableMapOf<String, String>() // id -> name
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var totalRelayedCount = 0
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val rediscoveryRunnable = object : Runnable {
+        override fun run() {
+            if (MeshRepository.isMeshActive.value) {
+                restartDiscovery()
+                retryDisconnectedPeers()
+            }
+            handler.postDelayed(this, REDISCOVERY_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -57,18 +80,20 @@ class MeshForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 startForeground(NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
             } catch (e: Exception) { startForeground(NOTIFICATION_ID, notification) }
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
 
         when (intent?.action ?: ACTION_START_MESH) {
-            ACTION_START_MESH  -> startMesh()
-            ACTION_STOP_MESH   -> { stopMesh(); stopSelf() }
+            ACTION_START_MESH    -> startMesh()
+            ACTION_STOP_MESH     -> { stopMesh(); stopSelf() }
             ACTION_BROADCAST_SOS -> {
-                val type = try { EmergencyType.valueOf(intent?.getStringExtra(EXTRA_EMERGENCY_TYPE) ?: "") }
-                           catch (_: Exception) { EmergencyType.EMERGENCY }
+                val type = try {
+                    EmergencyType.valueOf(intent?.getStringExtra(EXTRA_EMERGENCY_TYPE) ?: "")
+                } catch (_: Exception) { EmergencyType.EMERGENCY }
                 val lat = intent?.getDoubleExtra(EXTRA_LATITUDE, 0.0) ?: 0.0
                 val lng = intent?.getDoubleExtra(EXTRA_LONGITUDE, 0.0) ?: 0.0
                 triggerSos(type, lat, lng)
@@ -82,7 +107,6 @@ class MeshForegroundService : Service() {
     // ── Swipe Survival ──────────────────────────────────────────────────
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "onTaskRemoved: scheduling auto-restart")
         MeshRepository.addLog("🛡️ App swiped — background relay persisting...")
         val pending = PendingIntent.getService(
             applicationContext, 1,
@@ -97,6 +121,7 @@ class MeshForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(rediscoveryRunnable)
         stopMesh()
         releaseWakeLock()
     }
@@ -104,28 +129,77 @@ class MeshForegroundService : Service() {
     // ── Mesh Engine ─────────────────────────────────────────────────────
     private fun startMesh() {
         if (MeshRepository.isMeshActive.value) return
+        startAdvertisingAndDiscovery()
+    }
+
+    private fun startAdvertisingAndDiscovery() {
         val advOpts = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
         val discOpts = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
-        connectionsClient.startAdvertising(localDeviceName, SERVICE_ID, connectionLifecycleCallback, advOpts)
+
+        connectionsClient.startAdvertising(
+            localDeviceName, SERVICE_ID, connectionLifecycleCallback, advOpts
+        ).addOnSuccessListener {
+            MeshRepository.addLog("📡 Advertising as $localDeviceName")
+            connectionsClient.startDiscovery(SERVICE_ID, endpointDiscoveryCallback, discOpts)
+                .addOnSuccessListener {
+                    MeshRepository.setMeshActive(true)
+                    MeshRepository.addLog("⚡ MESH ACTIVE — scanning for peers every ${REDISCOVERY_INTERVAL_MS/1000}s")
+                    updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
+                    // Start rediscovery loop
+                    handler.removeCallbacks(rediscoveryRunnable)
+                    handler.postDelayed(rediscoveryRunnable, REDISCOVERY_INTERVAL_MS)
+                }
+                .addOnFailureListener { e ->
+                    MeshRepository.addLog("❌ Discovery Failed: ${e.message}")
+                    // Retry in 5s
+                    handler.postDelayed({ startAdvertisingAndDiscovery() }, RETRY_CONNECT_DELAY_MS)
+                }
+        }.addOnFailureListener { e ->
+            MeshRepository.addLog("❌ Advertising Failed: ${e.message}")
+            handler.postDelayed({ startAdvertisingAndDiscovery() }, RETRY_CONNECT_DELAY_MS)
+        }
+    }
+
+    /** Stop then restart discovery to refresh nearby peer list */
+    private fun restartDiscovery() {
+        try { connectionsClient.stopDiscovery() } catch (_: Exception) {}
+        val discOpts = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
+        connectionsClient.startDiscovery(SERVICE_ID, endpointDiscoveryCallback, discOpts)
             .addOnSuccessListener {
-                connectionsClient.startDiscovery(SERVICE_ID, endpointDiscoveryCallback, discOpts)
-                    .addOnSuccessListener {
-                        MeshRepository.setMeshActive(true)
-                        MeshRepository.addLog("⚡ BACKGROUND MESH ACTIVE as $localDeviceName")
-                        updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
-                    }
-                    .addOnFailureListener { e -> MeshRepository.addLog("❌ Discovery Failed: ${e.message}") }
+                MeshRepository.addLog("🔄 Rediscovery sweep — Peers: ${connectedEndpoints.size}")
             }
-            .addOnFailureListener { e -> MeshRepository.addLog("❌ Advertising Failed: ${e.message}") }
+            .addOnFailureListener { e ->
+                MeshRepository.addLog("⚠️ Rediscovery failed: ${e.message}")
+            }
+    }
+
+    /** Try to reconnect to any previously-seen peers that dropped off */
+    private fun retryDisconnectedPeers() {
+        val toRetry = discoveredEndpoints.filter { (id, _) ->
+            !connectedEndpoints.containsKey(id) && !connectingEndpoints.contains(id)
+        }
+        toRetry.forEach { (id, name) ->
+            MeshRepository.addLog("🔁 Retrying connection to $name")
+            connectingEndpoints.add(id)
+            MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+            connectionsClient.requestConnection(localDeviceName, id, connectionLifecycleCallback)
+                .addOnFailureListener {
+                    connectingEndpoints.remove(id)
+                    MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+                }
+        }
     }
 
     private fun stopMesh() {
+        handler.removeCallbacks(rediscoveryRunnable)
         try {
             connectionsClient.stopAdvertising()
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
         } catch (_: Exception) {}
-        connectedEndpoints.clear(); connectingEndpoints.clear()
+        connectedEndpoints.clear()
+        connectingEndpoints.clear()
+        discoveredEndpoints.clear()
         MeshRepository.updateConnectedEndpoints(emptyMap())
         MeshRepository.updateConnectingEndpoints(emptySet())
         MeshRepository.setMeshActive(false)
@@ -172,7 +246,20 @@ class MeshForegroundService : Service() {
     }
 
     // ── Nearby Callbacks ────────────────────────────────────────────────
-    private val payloadCallback = object : PayloadCallback() {
+    private fun connectToEndpoint(endpointId: String) {
+        if (!connectedEndpoints.containsKey(endpointId) &&
+            !connectingEndpoints.contains(endpointId)) {
+            connectingEndpoints.add(endpointId)
+            MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+            connectionsClient.requestConnection(localDeviceName, endpointId, connectionLifecycleCallback)
+                .addOnFailureListener {
+                    connectingEndpoints.remove(endpointId)
+                    MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+                }
+        }
+    }
+
+    private val payloadCallback: PayloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             if (payload.type != Payload.Type.BYTES) return
             val bytes = payload.asBytes() ?: return
@@ -180,13 +267,14 @@ class MeshForegroundService : Service() {
                               GatewayUploader.hasInternetConnection(this@MeshForegroundService)
             val (_, decision) = meshRouter.onReceivePayload(bytes, endpointId, hasInternet)
             when (decision) {
-                is MeshDecision.InvalidPayload    -> MeshRepository.addLog("❌ Invalid payload")
+                is MeshDecision.InvalidPayload    -> {}
                 is MeshDecision.DroppedDuplicate  -> MeshRepository.addLog("🛡️ Duplicate dropped")
                 is MeshDecision.DroppedTtlExpired -> MeshRepository.addLog("⏳ TTL expired")
                 is MeshDecision.ProcessAndRelay   -> {
                     val orig = decision.originalPacket
                     MeshRepository.setLastReceivedSos(orig)
-                    priorityQueue.enqueue(orig); MeshRepository.updateRelayQueue(priorityQueue.getAll())
+                    priorityQueue.enqueue(orig)
+                    MeshRepository.updateRelayQueue(priorityQueue.getAll())
                     MeshRepository.addLog("🚨 RX SOS from ${orig.senderId} (hops: ${orig.hopCount})")
                     if (decision.shouldUploadToGateway) {
                         orig.gatewayId = localDeviceName
@@ -202,48 +290,60 @@ class MeshForegroundService : Service() {
         override fun onPayloadTransferUpdate(id: String, update: PayloadTransferUpdate) {}
     }
 
-    private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
+    private val connectionLifecycleCallback: ConnectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
             connectingEndpoints.add(endpointId)
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
             MeshRepository.addLog("🤝 Handshake: ${info.endpointName}")
+            // Always accept — let both sides connect freely
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             connectingEndpoints.remove(endpointId)
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
             if (result.status.isSuccess) {
-                connectedEndpoints[endpointId] = "Device-${endpointId.take(4).uppercase()}"
+                val name = discoveredEndpoints[endpointId] ?: "Device-${endpointId.take(4).uppercase()}"
+                connectedEndpoints[endpointId] = name
                 MeshRepository.updateConnectedEndpoints(connectedEndpoints.toMap())
-                MeshRepository.addLog("🔗 Connected! Peers: ${connectedEndpoints.size}")
+                MeshRepository.addLog("🔗 Connected to $name! Total Peers: ${connectedEndpoints.size}")
                 updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
             } else {
-                MeshRepository.addLog("❌ Connection failed: ${result.status.statusMessage}")
+                MeshRepository.addLog("❌ Connection failed (${result.status.statusCode}) — will retry")
+                // Retry after delay
+                handler.postDelayed({
+                    if (discoveredEndpoints.containsKey(endpointId)) {
+                        connectToEndpoint(endpointId)
+                    }
+                }, RETRY_CONNECT_DELAY_MS)
             }
         }
         override fun onDisconnected(endpointId: String) {
-            connectedEndpoints.remove(endpointId); connectingEndpoints.remove(endpointId)
+            val name = connectedEndpoints.remove(endpointId) ?: endpointId
+            connectingEndpoints.remove(endpointId)
             MeshRepository.updateConnectedEndpoints(connectedEndpoints.toMap())
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
-            MeshRepository.addLog("🔌 Peer disconnected. Peers: ${connectedEndpoints.size}")
+            MeshRepository.addLog("🔌 $name disconnected — will retry. Peers: ${connectedEndpoints.size}")
             updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
+            // Immediately retry the disconnected peer
+            handler.postDelayed({
+                if (discoveredEndpoints.containsKey(endpointId)) {
+                    connectToEndpoint(endpointId)
+                }
+            }, RETRY_CONNECT_DELAY_MS)
         }
     }
 
-    private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
+    private val endpointDiscoveryCallback: EndpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
         override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
             if (info.serviceId != SERVICE_ID) return
-            if (localDeviceName < info.endpointName &&
-                !connectedEndpoints.containsKey(endpointId) &&
-                !connectingEndpoints.contains(endpointId)) {
-                connectingEndpoints.add(endpointId)
-                MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
-                MeshRepository.addLog("📡 Connecting to ${info.endpointName}")
-                connectionsClient.requestConnection(localDeviceName, endpointId, connectionLifecycleCallback)
-                    .addOnFailureListener { connectingEndpoints.remove(endpointId) }
-            }
+            discoveredEndpoints[endpointId] = info.endpointName
+            // Connect to ALL peers — no alphabetical filter, both sides attempt
+            MeshRepository.addLog("📡 Discovered ${info.endpointName} — connecting...")
+            connectToEndpoint(endpointId)
         }
-        override fun onEndpointLost(endpointId: String) {}
+        override fun onEndpointLost(endpointId: String) {
+            MeshRepository.addLog("📡 Peer ${discoveredEndpoints[endpointId] ?: endpointId} out of range")
+        }
     }
 
     // ── Notification & WakeLock ─────────────────────────────────────────
