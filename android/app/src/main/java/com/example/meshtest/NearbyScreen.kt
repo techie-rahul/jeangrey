@@ -61,22 +61,21 @@ enum class NavigationTab {
 
 @Composable
 fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
-    val connectionsClient = remember { Nearby.getConnectionsClient(context) }
-    val localDeviceName = remember {
-        "${Build.MANUFACTURER.uppercase()}-${Build.MODEL}"
-    }
-
-    val meshRouter = remember { MeshRouter(localDeviceName) }
-    val coroutineScope = rememberCoroutineScope()
+    val localDeviceName = remember { "${Build.MANUFACTURER.uppercase()}-${Build.MODEL}" }
     val listState = rememberLazyListState()
 
-    // ── Connectivity & App State ────────────────────────────────────────
-    var isMeshActive by remember { mutableStateOf(false) }
-    var serverUrl by remember { mutableStateOf(DEFAULT_SERVER_URL) }
-    var isGatewayModeEnabled by remember { mutableStateOf(true) }
-    val connectedEndpoints = remember { mutableStateMapOf<String, String>() } // id -> name
-    val connectingEndpoints = remember { mutableStateSetOf<String>() }
-    val terminalLogs = remember { mutableStateListOf<String>() }
+    // ── All state comes from MeshRepository (background service) ─────────
+    val isMeshActiveState by com.example.meshtest.service.MeshRepository.isMeshActive.collectAsState()
+    val connectedEndpointsState by com.example.meshtest.service.MeshRepository.connectedEndpoints.collectAsState()
+    val terminalLogsState by com.example.meshtest.service.MeshRepository.terminalLogs.collectAsState()
+    val relayQueueItemsState by com.example.meshtest.service.MeshRepository.relayQueueItems.collectAsState()
+    val serverUrlState by com.example.meshtest.service.MeshRepository.serverUrl.collectAsState()
+    val isGatewayEnabledState by com.example.meshtest.service.MeshRepository.isGatewayModeEnabled.collectAsState()
+
+    // Auto-scroll terminal log on new entries
+    LaunchedEffect(terminalLogsState.size) {
+        if (terminalLogsState.isNotEmpty()) listState.animateScrollToItem(terminalLogsState.size - 1)
+    }
 
     // ── Location state ──────────────────────────────────────────────────
     var latitude by remember { mutableStateOf<Double?>(null) }
@@ -95,297 +94,60 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         ) {
             try {
                 val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-                // Use last-known location as an immediate fallback
                 val lastLoc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                     ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
                     ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
                 if (lastLoc != null) {
-                    latitude = lastLoc.latitude
-                    longitude = lastLoc.longitude
-                    locTimestamp = lastLoc.time
-                    Log.d(TAG, "📍 LAST-KNOWN LOCATION: lat=${lastLoc.latitude}, lng=${lastLoc.longitude}")
+                    latitude = lastLoc.latitude; longitude = lastLoc.longitude; locTimestamp = lastLoc.time
                 }
-                // Request a fresh high-accuracy fix
                 val locationListener = android.location.LocationListener { l ->
-                    latitude = l.latitude
-                    longitude = l.longitude
-                    locTimestamp = l.time
-                    Log.d(TAG, "📍 FRESH LOCATION FIX: lat=${l.latitude}, lng=${l.longitude}, accuracy=${l.accuracy}m")
+                    latitude = l.latitude; longitude = l.longitude; locTimestamp = l.time
                 }
                 @Suppress("DEPRECATION")
                 try { lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
                 @Suppress("DEPRECATION")
                 try { lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
-            } catch (e: Exception) {
-                Log.e(TAG, "Location acquisition failed", e)
-            }
-        } else {
-            Log.w(TAG, "ACCESS_FINE_LOCATION permission not granted — location will be unavailable")
+            } catch (e: Exception) { Log.e(TAG, "Location failed", e) }
         }
     }
 
     // Priority Relay Queue & UI State
-    val priorityQueue = remember { SosPriorityQueue() }
-    var relayQueueItems by remember { mutableStateOf(listOf<SosPacket>()) }
     var showSituationDialog by remember { mutableStateOf(false) }
     var createdSosInfo by remember { mutableStateOf<Triple<String, SosPriority, Int>?>(null) }
 
-    fun getBatteryPercentage(): Int {
-        return try {
-            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
-            bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 85
-        } catch (e: Exception) {
-            85
-        }
-    }
+    fun getBatteryPercentage(): Int = try {
+        (context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager)
+            ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 85
+    } catch (_: Exception) { 85 }
 
-    fun addLog(msg: String) {
-        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        terminalLogs.add("[$time] $msg")
-        coroutineScope.launch {
-            if (terminalLogs.isNotEmpty()) {
-                listState.animateScrollToItem(terminalLogs.size - 1)
-            }
-        }
-    }
-
-    fun clearLogs() {
-        terminalLogs.clear()
-        addLog("🧹 Log cleared.")
-    }
-
-    // --- Broadcast SOS Helper ---
-    fun broadcastPacketToPeers(packet: SosPacket, excludeEndpointId: String? = null) {
-        val payload = Payload.fromBytes(packet.toByteArray())
-        val targets = connectedEndpoints.keys.filter { it != excludeEndpointId }
-
-        if (targets.isEmpty()) {
-            addLog("⚠️ No other connected mesh peers to forward to.")
-            return
-        }
-
-        targets.forEach { targetId ->
-            connectionsClient.sendPayload(targetId, payload)
-                .addOnSuccessListener {
-                    Log.d(TAG, "Sent ${packet.messageId} to $targetId")
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Failed send to $targetId", e)
-                }
-        }
-        addLog("🚀 Relayed ${packet.messageId} (TTL: ${packet.ttl}) ➔ ${targets.size} peer(s)")
-    }
-
-    // --- Callbacks ---
-    val payloadCallback = remember {
-        object : PayloadCallback() {
-            override fun onPayloadReceived(endpointId: String, payload: Payload) {
-                if (payload.type == Payload.Type.BYTES) {
-                    val bytes = payload.asBytes() ?: return
-                    val hasInternet = isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)
-
-                    val (packet, decision) = meshRouter.onReceivePayload(bytes, endpointId, hasInternet)
-                    val senderName = connectedEndpoints[endpointId] ?: endpointId
-
-                    when (decision) {
-                        is MeshDecision.InvalidPayload -> {
-                            addLog("❌ Unknown data received from $senderName")
-                        }
-                        is MeshDecision.DroppedDuplicate -> {
-                            addLog("🛡️ Dropped duplicate ${decision.messageId} from $senderName (Loop Prevented)")
-                        }
-                        is MeshDecision.DroppedTtlExpired -> {
-                            addLog("⏳ TTL expired for ${decision.messageId} from $senderName")
-                        }
-                        is MeshDecision.ProcessAndRelay -> {
-                            val orig = decision.originalPacket
-                            Log.d(TAG, "📍 RELAY LOCATION (original sender ${orig.senderId}): lat=${orig.latitude}, lng=${orig.longitude}")
-                            priorityQueue.enqueue(orig)
-                            relayQueueItems = priorityQueue.getAll()
-                            addLog("🚨 RX SOS ${orig.messageId} | Priority: ${orig.priority} | Origin: ${orig.senderId} | Hops: ${orig.hopCount}")
-
-                            // Check Gateway Upload
-                            if (decision.shouldUploadToGateway) {
-                                addLog("🌐 GATEWAY ACTIVE: Uploading ${orig.messageId} to Cloud...")
-                                orig.gatewayId = localDeviceName
-                                GatewayUploader.uploadSos(
-                                    serverBaseUrl = serverUrl,
-                                    packet = orig,
-                                    onSuccess = { res ->
-                                        addLog("✅ CLOUD UPLOAD SUCCESS: $res")
-                                    },
-                                    onError = { err ->
-                                        addLog("❌ CLOUD UPLOAD ERROR: $err")
-                                    }
-                                )
-                            }
-
-                            // Automatic Relay / Forwarding to other peers (A -> B -> C)
-                            decision.packetToForward?.let { forwardPacket ->
-                                broadcastPacketToPeers(forwardPacket, excludeEndpointId = endpointId)
-                            }
-                        }
-                    }
-                }
-            }
-
-            override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {}
-        }
-    }
-
-    val connectionLifecycleCallback = remember {
-        object : ConnectionLifecycleCallback() {
-            override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
-                Log.d(TAG, "Connection initiated with ${info.endpointName}")
-                addLog("🤝 Handshake with: ${info.endpointName}")
-                connectionsClient.acceptConnection(endpointId, payloadCallback)
-            }
-
-            override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-                connectingEndpoints.remove(endpointId)
-                if (result.status.statusCode == ConnectionsStatusCodes.STATUS_OK) {
-                    val peerName = "Device-${endpointId.take(4).uppercase()}"
-                    connectedEndpoints[endpointId] = peerName
-                    addLog("🔗 Connected with $peerName (Active Peers: ${connectedEndpoints.size})")
-                } else {
-                    addLog("❌ Connection status (${result.status.statusCode}) with $endpointId")
-                }
-            }
-
-            override fun onDisconnected(endpointId: String) {
-                val name = connectedEndpoints.remove(endpointId) ?: endpointId
-                connectingEndpoints.remove(endpointId)
-                addLog("🔌 Disconnected from $name")
-            }
-        }
-    }
-
-    val endpointDiscoveryCallback = remember {
-        object : EndpointDiscoveryCallback() {
-            override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
-                Log.d(TAG, "Found endpoint: ${info.endpointName} ($endpointId)")
-                val shouldInitiate = localDeviceName < info.endpointName
-
-                if (shouldInitiate && !connectedEndpoints.containsKey(endpointId) && !connectingEndpoints.contains(endpointId)) {
-                    connectingEndpoints.add(endpointId)
-                    addLog("📡 Auto-connecting to peer: ${info.endpointName}")
-                    connectionsClient.requestConnection(localDeviceName, endpointId, connectionLifecycleCallback)
-                        .addOnFailureListener { e ->
-                            connectingEndpoints.remove(endpointId)
-                            Log.e(TAG, "Connection request failed", e)
-                        }
-                } else if (!shouldInitiate) {
-                    addLog("👀 Discovered ${info.endpointName} (Waiting for incoming handshake)")
-                }
-            }
-
-            override fun onEndpointLost(endpointId: String) {
-                Log.d(TAG, "Lost nearby endpoint: $endpointId")
-            }
-        }
-    }
-
-    fun startMesh() {
-        val advOptions = AdvertisingOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
-        val discOptions = DiscoveryOptions.Builder().setStrategy(Strategy.P2P_CLUSTER).build()
-
-        connectionsClient.startAdvertising(localDeviceName, SERVICE_ID, connectionLifecycleCallback, advOptions)
-            .addOnSuccessListener {
-                connectionsClient.startDiscovery(SERVICE_ID, endpointDiscoveryCallback, discOptions)
-                    .addOnSuccessListener {
-                        isMeshActive = true
-                        addLog("⚡ MESH ACTIVE: Advertising & Discovering as $localDeviceName")
-                    }
-                    .addOnFailureListener { e ->
-                        addLog("❌ Discovery Failed: ${e.message}")
-                    }
-            }
-            .addOnFailureListener { e ->
-                addLog("❌ Advertising Failed: ${e.message}")
-            }
-    }
-
-    fun stopMesh() {
-        connectionsClient.stopAdvertising()
-        connectionsClient.stopDiscovery()
-        connectionsClient.stopAllEndpoints()
-        connectedEndpoints.clear()
-        connectingEndpoints.clear()
-        isMeshActive = false
-        addLog("🛑 Mesh Stopped")
-    }
+    fun addLog(msg: String) { com.example.meshtest.service.MeshRepository.addLog(msg) }
+    fun clearLogs() { com.example.meshtest.service.MeshRepository.clearLogs() }
+    fun startMesh() { com.example.meshtest.service.MeshForegroundService.startService(context) }
+    fun stopMesh() { com.example.meshtest.service.MeshForegroundService.stopService(context) }
 
     fun triggerPrioritySos(type: EmergencyType) {
-        val battery = getBatteryPercentage()
-        val priority = SosPriorityCalculator.calculate(type, battery)
-        val msgText = when (type) {
-            EmergencyType.LOST_ASSISTANCE -> "ASSISTANCE NEEDED: User is lost / needs search & rescue support."
-            EmergencyType.EMERGENCY -> "CRITICAL EMERGENCY: Immediate Medical & Evacuation Support Requested!"
-        }
-
-        // Use the real device location if available; otherwise use SosPacket defaults
         val sosLat = latitude ?: 0.0
         val sosLng = longitude ?: 0.0
-        Log.d(TAG, "📍 SOS LOCATION CAPTURED: lat=$sosLat, lng=$sosLng (raw state: lat=$latitude, lng=$longitude)")
-        addLog("📍 Location: lat=$sosLat, lng=$sosLng")
-
-        val sos = SosPacket(
-            senderId = localDeviceName,
-            batteryLevel = battery,
-            priority = priority.label,
-            emergencyType = type.name,
-            severity = if (priority == SosPriority.MEDIUM) "MEDIUM" else "CRITICAL",
-            latitude = sosLat,
-            longitude = sosLng,
-            ttl = 5,
-            hopCount = 0,
-            relayPath = listOf(localDeviceName),
-            messageText = msgText
-        )
-
-        meshRouter.registerLocalSos(sos)
-        priorityQueue.enqueue(sos)
-        relayQueueItems = priorityQueue.getAll()
-
-        createdSosInfo = Triple(sos.messageId, priority, battery)
-        addLog("🚨 [SOS INITIATED] ID: ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
-
-        if (isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)) {
-            addLog("🌐 LOCAL GATEWAY: Uploading directly to cloud backend...")
-            sos.gatewayId = localDeviceName
-            GatewayUploader.uploadSos(
-                serverBaseUrl = serverUrl,
-                packet = sos,
-                onSuccess = { res -> addLog("✅ Direct Cloud Upload: $res") },
-                onError = { err -> addLog("❌ Direct Cloud Upload Failed: $err") }
-            )
-        }
-
-        broadcastPacketToPeers(sos)
+        val battery = getBatteryPercentage()
+        val priority = SosPriorityCalculator.calculate(type, battery)
+        addLog("📍 SOS Location: lat=$sosLat, lng=$sosLng")
+        createdSosInfo = Triple("SOS-" + (100000..999999).random().toString(16).uppercase(), priority, battery)
+        com.example.meshtest.service.MeshForegroundService.triggerSos(context, type, sosLat, sosLng)
     }
 
     fun openInGoogleMaps() {
-        val lat = latitude
-        val lng = longitude
+        val lat = latitude; val lng = longitude
         if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
             try {
-                val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(ResQMesh+Node+$localDeviceName)")
-                val intent = Intent(Intent.ACTION_VIEW, uri)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                val intent = Intent(Intent.ACTION_VIEW,
+                    Uri.parse("geo:$lat,$lng?q=$lat,$lng(ResQMesh+Node+$localDeviceName)"))
+                    .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
                 context.startActivity(intent)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(context, "No maps application installed", Toast.LENGTH_SHORT).show()
             }
         } else {
-            Toast.makeText(context, "Location coordinates not yet acquired", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            connectionsClient.stopAdvertising()
-            connectionsClient.stopDiscovery()
-            connectionsClient.stopAllEndpoints()
+            Toast.makeText(context, "Location not yet acquired", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -415,7 +177,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         ) {
             // 1. HEADER
             ResQHeader(
-                isMeshActive = isMeshActive,
+                isMeshActive = isMeshActiveState,
                 onSettingsClick = { showSettingsDialog = true }
             )
 
@@ -441,7 +203,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                     // 3. START/STOP MESH CONTROLS
                     item {
                         ResQMeshControls(
-                            isMeshActive = isMeshActive,
+                            isMeshActive = isMeshActiveState,
                             permissionsGranted = permissionsGranted,
                             onStartMesh = { startMesh() },
                             onStopMesh = { stopMesh() }
@@ -452,17 +214,17 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 if (selectedTab == NavigationTab.DASHBOARD) {
                     // 4 & 5. MESH STATUS & TOPOLOGY
                     item {
-                        val hasInternet = remember(isMeshActive, isGatewayModeEnabled) {
-                            isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)
+                        val hasInternet = remember(isMeshActiveState, isGatewayEnabledState) {
+                            isGatewayEnabledState && GatewayUploader.hasInternetConnection(context)
                         }
                         ResQMeshStatusCard(
-                            isMeshActive = isMeshActive,
+                            isMeshActive = isMeshActiveState,
                             nodeId = localDeviceName,
-                            connectedPeersCount = connectedEndpoints.size,
-                            connectedEndpoints = connectedEndpoints,
+                            connectedPeersCount = connectedEndpointsState.size,
+                            connectedEndpoints = connectedEndpointsState,
                             hasInternet = hasInternet,
-                            serverUrl = serverUrl,
-                            recentRelayPath = relayQueueItems.firstOrNull()?.relayPath ?: emptyList()
+                            serverUrl = serverUrlState,
+                            recentRelayPath = relayQueueItemsState.firstOrNull()?.relayPath ?: emptyList()
                         )
                     }
                 }
@@ -471,7 +233,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 if (selectedTab == NavigationTab.DASHBOARD || selectedTab == NavigationTab.ALERTS) {
                     item {
                         ResQRelayQueueCard(
-                            queueItems = relayQueueItems,
+                            queueItems = relayQueueItemsState,
                             showAll = showAllQueueItems,
                             onToggleShowAll = { showAllQueueItems = !showAllQueueItems }
                         )
@@ -494,7 +256,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                 if (selectedTab == NavigationTab.DASHBOARD) {
                     item {
                         ResQLiveActivityCard(
-                            logs = terminalLogs,
+                            logs = terminalLogsState,
                             listState = listState,
                             onClearLogs = { clearLogs() }
                         )
@@ -689,7 +451,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
     // ── Settings Dialog ────────────────────────────────────────────────
     if (showSettingsDialog) {
-        var tempUrl by remember { mutableStateOf(serverUrl) }
+        var tempUrl by remember { mutableStateOf(serverUrlState) }
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             containerColor = ResQDarkCard,
@@ -703,22 +465,12 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "Local Node ID:",
-                        style = Typography.bodyMedium
-                    )
-                    Text(
-                        text = localDeviceName,
-                        style = Typography.labelMedium,
-                        color = ResQBlueLight
-                    )
+                    Text(text = "Local Node ID:", style = Typography.bodyMedium)
+                    Text(text = localDeviceName, style = Typography.labelMedium, color = ResQBlueLight)
 
                     HorizontalDivider(color = ResQBorderSubtle)
 
-                    Text(
-                        text = "Cloud Gateway Backend URL:",
-                        style = Typography.bodyMedium
-                    )
+                    Text(text = "Cloud Gateway Backend URL:", style = Typography.bodyMedium)
                     OutlinedTextField(
                         value = tempUrl,
                         onValueChange = { tempUrl = it },
@@ -740,8 +492,8 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                     ) {
                         Text("Gateway Upload Enabled", style = Typography.bodyMedium)
                         Switch(
-                            checked = isGatewayModeEnabled,
-                            onCheckedChange = { isGatewayModeEnabled = it },
+                            checked = isGatewayEnabledState,
+                            onCheckedChange = { com.example.meshtest.service.MeshRepository.setGatewayMode(it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
                                 checkedTrackColor = ResQBlue
@@ -753,7 +505,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             confirmButton = {
                 Button(
                     onClick = {
-                        serverUrl = tempUrl.trim()
+                        com.example.meshtest.service.MeshRepository.setServerUrl(tempUrl.trim())
                         showSettingsDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ResQBlue),
