@@ -78,13 +78,19 @@ app.post('/api/sos', (req, res) => {
     return res.status(200).json({ status: 'DUPLICATE_IGNORED', alert: existing });
   }
 
+  // Preserve exact coordinates from the original sender — never silently replace with defaults
+  const parsedLat = (latitude != null && !isNaN(parseFloat(latitude))) ? parseFloat(latitude) : null;
+  const parsedLng = (longitude != null && !isNaN(parseFloat(longitude))) ? parseFloat(longitude) : null;
+
+  console.log(`📍 SOS LOCATION RECEIVED: lat=${parsedLat}, lng=${parsedLng} (raw: lat=${latitude}, lng=${longitude})`);
+
   const newAlert = {
     messageId,
     senderId,
     timestamp: timestamp || Date.now(),
     receivedAt: Date.now(),
-    latitude: parseFloat(latitude) || 26.9124,
-    longitude: parseFloat(longitude) || 75.7873,
+    latitude: parsedLat,
+    longitude: parsedLng,
     severity,
     batteryLevel: batteryLevel !== undefined ? batteryLevel : null,
     ttl: ttl !== undefined ? ttl : 0,
@@ -98,7 +104,7 @@ app.post('/api/sos', (req, res) => {
   sosAlerts.unshift(newAlert);
   saveAlerts();
 
-  console.log(`🚨 [NEW EMERGENCY RECEIVED] ID: ${messageId} | Origin: ${senderId} | Hops: ${newAlert.hopCount} | Via Gateway: ${newAlert.gatewayId}`);
+  console.log(`🚨 [NEW EMERGENCY RECEIVED] ID: ${messageId} | Origin: ${senderId} | Hops: ${newAlert.hopCount} | Via Gateway: ${newAlert.gatewayId} | 📍 lat=${parsedLat}, lng=${parsedLng}`);
 
   // Broadcast to Live Web Dashboard via WebSocket
   io.emit('new_sos', newAlert);

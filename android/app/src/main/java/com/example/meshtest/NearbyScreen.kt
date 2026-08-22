@@ -1,8 +1,12 @@
 package com.example.meshtest
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Looper
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -60,6 +65,47 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
     val connectedEndpoints = remember { mutableStateMapOf<String, String>() } // id -> name
     val connectingEndpoints = remember { mutableStateSetOf<String>() }
     val terminalLogs = remember { mutableStateListOf<String>() }
+
+    // ── Location state ──────────────────────────────────────────────────
+    var latitude by remember { mutableStateOf<Double?>(null) }
+    var longitude by remember { mutableStateOf<Double?>(null) }
+    var locTimestamp by remember { mutableStateOf<Long?>(null) }
+
+    // Acquire real device GPS location
+    LaunchedEffect(permissionsGranted) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            try {
+                val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                // Use last-known location as an immediate fallback
+                val lastLoc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                    ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                    ?: lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER)
+                if (lastLoc != null) {
+                    latitude = lastLoc.latitude
+                    longitude = lastLoc.longitude
+                    locTimestamp = lastLoc.time
+                    Log.d(TAG, "📍 LAST-KNOWN LOCATION: lat=${lastLoc.latitude}, lng=${lastLoc.longitude}")
+                }
+                // Request a fresh high-accuracy fix
+                val locationListener = android.location.LocationListener { l ->
+                    latitude = l.latitude
+                    longitude = l.longitude
+                    locTimestamp = l.time
+                    Log.d(TAG, "📍 FRESH LOCATION FIX: lat=${l.latitude}, lng=${l.longitude}, accuracy=${l.accuracy}m")
+                }
+                @Suppress("DEPRECATION")
+                try { lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
+                @Suppress("DEPRECATION")
+                try { lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, locationListener, Looper.getMainLooper()) } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e(TAG, "Location acquisition failed", e)
+            }
+        } else {
+            Log.w(TAG, "ACCESS_FINE_LOCATION permission not granted — location will be unavailable")
+        }
+    }
 
     // Priority Relay Queue & UI State
     val priorityQueue = remember { SosPriorityQueue() }
@@ -137,6 +183,7 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                         }
                         is MeshDecision.ProcessAndRelay -> {
                             val orig = decision.originalPacket
+                            Log.d(TAG, "📍 RELAY LOCATION (original sender ${orig.senderId}): lat=${orig.latitude}, lng=${orig.longitude}")
                             priorityQueue.enqueue(orig)
                             relayQueueItems = priorityQueue.getAll()
                             addLog("🚨 RX SOS ${orig.messageId} | Priority: ${orig.priority} | Origin: ${orig.senderId} | Hops: ${orig.hopCount}")
@@ -261,12 +308,20 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             EmergencyType.EMERGENCY -> "CRITICAL EMERGENCY: Immediate Medical & Evacuation Support Requested!"
         }
 
+        // Use the real device location if available; otherwise use SosPacket defaults
+        val sosLat = latitude ?: 0.0
+        val sosLng = longitude ?: 0.0
+        Log.d(TAG, "📍 SOS LOCATION CAPTURED: lat=$sosLat, lng=$sosLng (raw state: lat=$latitude, lng=$longitude)")
+        addLog("📍 Location: lat=$sosLat, lng=$sosLng")
+
         val sos = SosPacket(
             senderId = localDeviceName,
             batteryLevel = battery,
             priority = priority.label,
             emergencyType = type.name,
             severity = if (priority == SosPriority.MEDIUM) "MEDIUM" else "CRITICAL",
+            latitude = sosLat,
+            longitude = sosLng,
             ttl = 5,
             hopCount = 0,
             relayPath = listOf(localDeviceName),
