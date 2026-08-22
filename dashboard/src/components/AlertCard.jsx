@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, Battery, ShieldAlert, ArrowRight, CheckCircle2, Clock, MapPin, Activity } from 'lucide-react';
+import { Radio, Battery, ShieldAlert, ArrowRight, CheckCircle2, Clock, MapPin, Activity, ExternalLink } from 'lucide-react';
 
 export default function AlertCard({ alert, isSelected, onSelect, onUpdateStatus }) {
   const isCritical = alert.severity === 'CRITICAL';
@@ -52,12 +52,43 @@ export default function AlertCard({ alert, isSelected, onSelect, onUpdateStatus 
         {alert.messageText}
       </p>
 
-      <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 mb-3">
-        <div className="flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
-          <span className="truncate">{alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
+      <div className="grid grid-cols-1 gap-2 text-xs font-mono text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 mb-3">
+        {/* Location — clickable Google Maps link */}
+        {alert.latitude != null && alert.longitude != null && !isNaN(alert.latitude) && !isNaN(alert.longitude) ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span className="text-[10px] uppercase text-slate-500 font-semibold">Location</span>
+            </div>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${alert.latitude},${alert.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-slate-200 hover:text-white transition truncate block"
+            >
+              {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)}
+            </a>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${alert.latitude},${alert.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 transition bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 px-2.5 py-1 rounded-md"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Open in Google Maps ↗
+            </a>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span className="text-slate-500 italic">📍 Location unavailable</span>
+          </div>
+        )}
+
+        {/* Timestamp */}
+        <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800/50">
           <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span>{new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
         </div>

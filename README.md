@@ -3,8 +3,9 @@
 > **Track 6: Disaster Management & Public Safety**  
 > **Problem 6.1: Offline Mesh SOS Relay for Signal-Dead Zones**
 > 
-> 🌐 **Live Cloud Gateway**: [https://jeangrey.onrender.com](https://jeangrey.onrender.com)  
-> 🗺️ **Control Dashboard**: [https://jeangrey.onrender.com/api/sos](https://jeangrey.onrender.com/api/sos)
+> 🌐 **Live Cloud Gateway**: https://jeangrey.onrender.com
+
+> 🗺️ **Control Dashboard**: https://jeangrey.vercel.app/
 
 ---
 
@@ -76,11 +77,11 @@ In major disasters (floods, earthquakes, cyclones), cellular towers and internet
 cd server && npm install && npm start
 cd dashboard && npm install && npm run dev
 ```
-Open **`http://localhost:3000`** in your browser.
+Open **`https://jeangrey.onrender.com`** in your browser.
 
 ### 2. Run Android App
 1. Open the `android/` directory in **Android Studio**.
 2. Connect your Android devices (USB Debugging ON).
 3. Build and install on 2 or more physical devices.
 4. Tap **"Start Mesh"** on all devices.
-5. On any offline device, tap **"🚨 BROADCAST SOS"** and watch the packet hop to the connected gateway and appear on the web dashboard!
+5. On any offline device, tap **"🚨 BROADCAST SOS"** to send an emergency packet through the mesh network to a connected gateway, where it instantly appears on the web dashboard!
