@@ -23,7 +23,8 @@ data class SosPacket(
     val hopCount: Int = 0,
     val relayPath: List<String> = listOf(senderId),
     val messageText: String = "EMERGENCY SOS: Immediate evacuation requested.",
-    var gatewayId: String? = null
+    var gatewayId: String? = null,
+    val packetType: String = "SOS"
 ) {
     fun toJsonString(): String {
         val json = JSONObject()
@@ -44,6 +45,7 @@ data class SosPacket(
         if (gatewayId != null) {
             json.put("gatewayId", gatewayId)
         }
+        json.put("packetType", packetType)
 
         val pathArray = JSONArray()
         relayPath.forEach { pathArray.put(it) }
@@ -92,7 +94,8 @@ data class SosPacket(
                     hopCount = json.optInt("hopCount", 0),
                     relayPath = if (relayList.isNotEmpty()) relayList else listOf(json.optString("senderId", "UNKNOWN")),
                     messageText = json.optString("messageText", "EMERGENCY SOS"),
-                    gatewayId = if (json.has("gatewayId")) json.getString("gatewayId") else null
+                    gatewayId = if (json.has("gatewayId")) json.getString("gatewayId") else null,
+                    packetType = json.optString("packetType", "SOS")
                 )
             } catch (e: Exception) {
                 null

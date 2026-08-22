@@ -113,6 +113,8 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
 
     // Priority Relay Queue & UI State
     var showSituationDialog by remember { mutableStateOf(false) }
+    var showMessageDialog by remember { mutableStateOf(false) }
+    var emergencyMessageText by remember { mutableStateOf("") }
     var createdSosInfo by remember { mutableStateOf<Triple<String, SosPriority, Int>?>(null) }
 
     fun getBatteryPercentage(): Int = try {
@@ -133,6 +135,51 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
         addLog("📍 SOS Location: lat=$sosLat, lng=$sosLng")
         createdSosInfo = Triple("SOS-" + (100000..999999).random().toString(16).uppercase(), priority, battery)
         com.example.meshtest.service.MeshForegroundService.triggerSos(context, type, sosLat, sosLng)
+    }
+
+    fun triggerEmergencyMessage(text: String) {
+        val battery = getBatteryPercentage()
+        val priority = SosPriority.HIGH
+        
+        val sosLat = latitude ?: 0.0
+        val sosLng = longitude ?: 0.0
+        Log.d(TAG, "📍 MESSAGE LOCATION CAPTURED: lat=$sosLat, lng=$sosLng")
+        addLog("📍 Location: lat=$sosLat, lng=$sosLng")
+
+        val sos = SosPacket(
+            senderId = localDeviceName,
+            batteryLevel = battery,
+            priority = priority.label,
+            emergencyType = EmergencyType.EMERGENCY.name,
+            severity = "CRITICAL",
+            latitude = sosLat,
+            longitude = sosLng,
+            ttl = 5,
+            hopCount = 0,
+            relayPath = listOf(localDeviceName),
+            messageText = text,
+            packetType = "MESSAGE"
+        )
+
+        meshRouter.registerLocalSos(sos)
+        priorityQueue.enqueue(sos)
+        relayQueueItems = priorityQueue.getAll()
+
+        createdSosInfo = Triple(sos.messageId, priority, battery)
+        addLog("💬 [MSG INITIATED] ID: ${sos.messageId} | Priority: ${priority.label}")
+
+        if (isGatewayModeEnabled && GatewayUploader.hasInternetConnection(context)) {
+            addLog("🌐 LOCAL GATEWAY: Uploading directly to cloud backend...")
+            sos.gatewayId = localDeviceName
+            GatewayUploader.uploadSos(
+                serverBaseUrl = serverUrl,
+                packet = sos,
+                onSuccess = { res -> addLog("✅ Direct Cloud Upload: $res") },
+                onError = { err -> addLog("❌ Direct Cloud Upload Failed: $err") }
+            )
+        }
+
+        broadcastPacketToPeers(sos)
     }
 
     fun openInGoogleMaps() {
@@ -197,6 +244,16 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
                         ResQSosEmergencyButton(
                             permissionsGranted = permissionsGranted,
                             onSosClick = { showSituationDialog = true }
+                        )
+                    }
+
+                    item {
+                        ResQEmergencyDetailsButton(
+                            permissionsGranted = permissionsGranted,
+                            onClick = { 
+                                emergencyMessageText = "" 
+                                showMessageDialog = true 
+                            }
                         )
                     }
 
@@ -359,6 +416,82 @@ fun NearbyScreen(context: Context, permissionsGranted: Boolean) {
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showSituationDialog = false }) {
+                    Text("Cancel", color = ResQTextSecondary)
+                }
+            }
+        )
+    }
+
+    // ── Emergency Details Dialog ────────────────────────────────────────
+    if (showMessageDialog) {
+        AlertDialog(
+            onDismissRequest = { showMessageDialog = false },
+            containerColor = ResQDarkCard,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("💬", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "EMERGENCY DETAILS",
+                        style = Typography.titleMedium,
+                        color = ResQTextPrimary
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Provide details about the emergency.",
+                        style = Typography.bodyMedium,
+                        color = ResQTextSecondary
+                    )
+
+                    OutlinedTextField(
+                        value = emergencyMessageText,
+                        onValueChange = { 
+                            if (it.length <= 140) {
+                                emergencyMessageText = it
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        textStyle = Typography.bodyLarge.copy(color = ResQTextPrimary),
+                        placeholder = { Text("e.g., Need medical help. Two people injured.", color = ResQTextSecondary) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ResQBlueLight,
+                            unfocusedBorderColor = ResQBorder,
+                            focusedContainerColor = ResQDarkCardSubtle,
+                            unfocusedContainerColor = ResQDarkCardSubtle
+                        )
+                    )
+
+                    Text(
+                        text = "${emergencyMessageText.length}/140",
+                        style = Typography.bodySmall,
+                        color = if (emergencyMessageText.length == 140) ResQRed else ResQTextSecondary,
+                        modifier = Modifier.align(Alignment.End)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (emergencyMessageText.isNotBlank()) {
+                            showMessageDialog = false
+                            triggerEmergencyMessage(emergencyMessageText.trim())
+                        }
+                    },
+                    enabled = emergencyMessageText.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = ResQBlue),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Send Details", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMessageDialog = false }) {
                     Text("Cancel", color = ResQTextSecondary)
                 }
             }
@@ -648,6 +781,65 @@ fun ResQSosEmergencyButton(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text("➔", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// COMPONENT 2.5: SEND EMERGENCY DETAILS BUTTON
+// ───────────────────────────────────────────────────────────────────────
+@Composable
+fun ResQEmergencyDetailsButton(
+    permissionsGranted: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        enabled = permissionsGranted,
+        shape = RoundedCornerShape(16.dp),
+        color = ResQBlue.copy(alpha = 0.2f),
+        border = BorderStroke(1.dp, ResQBlueLight.copy(alpha = 0.5f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("💬", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "SEND EMERGENCY DETAILS",
+                        style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ResQBlueLight
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Broadcast a custom message",
+                    style = Typography.bodyMedium.copy(fontSize = 12.sp),
+                    color = ResQTextSecondary
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = ResQBlueLight.copy(alpha = 0.1f),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("➔", color = ResQBlueLight, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
         }

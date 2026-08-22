@@ -58,6 +58,7 @@ app.post('/api/sos', (req, res) => {
     hopCount,
     relayPath = [],
     gatewayId,
+    packetType = 'SOS',
     messageText = 'EMERGENCY SOS: Immediate assistance required.'
   } = req.body;
 
@@ -97,6 +98,7 @@ app.post('/api/sos', (req, res) => {
     hopCount: hopCount || (relayPath.length > 0 ? relayPath.length - 1 : 0),
     relayPath: relayPath.length > 0 ? relayPath : [senderId],
     gatewayId: gatewayId || 'UNKNOWN_GATEWAY',
+    packetType,
     messageText,
     status: 'ACTIVE'
   };
