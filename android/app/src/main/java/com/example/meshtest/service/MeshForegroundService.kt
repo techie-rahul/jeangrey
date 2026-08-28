@@ -1,9 +1,13 @@
 package com.example.meshtest.service
 
+import android.Manifest
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -11,6 +15,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.example.meshtest.MainActivity
 import com.example.meshtest.mesh.MeshDecision
 import com.example.meshtest.mesh.MeshRouter
@@ -22,13 +27,16 @@ import com.example.meshtest.model.SosPriorityQueue
 import com.example.meshtest.network.GatewayUploader
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
+import java.util.ArrayDeque
 
 /**
  * Foreground Service: keeps ResQMesh P2P relay alive in background.
- * - PARTIAL_WAKE_LOCK: survives screen-off
+ * - PARTIAL_WAKE_LOCK & WIFI_LOCK: prevents CPU sleep and Wi-Fi Direct sleep on Xiaomi/Samsung/MIUI
  * - START_STICKY + onTaskRemoved AlarmManager: survives swipe-away
- * - Deterministic tie-breaker with delayed fallback: prevents cross-connection race collisions
- * - Staggered auto-retry on drop / disconnect
+ * - Serialized Connection Queue: eliminates parallel handshake collisions and radio busy errors
+ * - Invalidation of Stale Endpoints: prevents redialing dead IDs on disconnect
+ * - Fallback Location Query: ensures GPS coordinates are never 0.0 even if UI fix was delayed
+ * - Max Peers Cap: maintains stable multi-hop tree topology without radio saturation
  */
 class MeshForegroundService : Service() {
 
@@ -37,7 +45,9 @@ class MeshForegroundService : Service() {
     private val CHANNEL_ID = "resqmesh_relay_channel"
     private val SERVICE_ID = "com.example.meshtest.sos"
 
-    private val FALLBACK_INITIATE_DELAY_MS = 5_000L
+    private val MAX_ACTIVE_PEERS = 4
+    private val FALLBACK_INITIATE_DELAY_MS = 10_000L
+    private val HANDSHAKE_TIMEOUT_MS = 15_000L
 
     private lateinit var connectionsClient: ConnectionsClient
     private lateinit var localDeviceName: String
@@ -48,9 +58,27 @@ class MeshForegroundService : Service() {
     private val connectingEndpoints = mutableSetOf<String>()          // endpointIds in progress
     private val discoveredEndpoints = mutableMapOf<String, String>()  // endpointId -> name
 
+    // Serialized connection handshake queue
+    private val connectionQueue = ArrayDeque<String>()
+    private var isHandshakeActive = false
+    private var activeHandshakeEndpoint: String? = null
+    private var isRadioCooldownActive = false
+
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
     private var totalRelayedCount = 0
     private val handler = Handler(Looper.getMainLooper())
+
+    private val handshakeTimeoutRunnable = Runnable {
+        activeHandshakeEndpoint?.let { ep ->
+            MeshRepository.addLog("⏱️ Handshake with ${discoveredEndpoints[ep] ?: ep} timed out — releasing queue.")
+            connectingEndpoints.remove(ep)
+            MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+        }
+        isHandshakeActive = false
+        activeHandshakeEndpoint = null
+        processNextConnection()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -59,6 +87,7 @@ class MeshForegroundService : Service() {
         meshRouter = MeshRouter(localDeviceName)
         createNotificationChannel()
         acquireWakeLock()
+        acquireWifiLock()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -120,6 +149,27 @@ class MeshForegroundService : Service() {
         handler.removeCallbacksAndMessages(null)
         stopMesh()
         releaseWakeLock()
+        releaseWifiLock()
+    }
+
+    // ── Fallback Location Acquisition ───────────────────────────────────
+    private fun getFallbackLocation(): Pair<Double, Double> {
+        return try {
+            val lm = getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return Pair(0.0, 0.0)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return Pair(0.0, 0.0)
+            }
+            val lastGps = try { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) } catch (_: Exception) { null }
+            val lastNet = try { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) } catch (_: Exception) { null }
+            val lastPassive = try { lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) } catch (_: Exception) { null }
+            val best = lastGps ?: lastNet ?: lastPassive
+            if (best != null && (best.latitude != 0.0 || best.longitude != 0.0)) {
+                Pair(best.latitude, best.longitude)
+            } else {
+                Pair(0.0, 0.0)
+            }
+        } catch (_: Exception) { Pair(0.0, 0.0) }
     }
 
     // ── Mesh Engine ─────────────────────────────────────────────────────
@@ -159,6 +209,10 @@ class MeshForegroundService : Service() {
             connectionsClient.stopDiscovery()
             connectionsClient.stopAllEndpoints()
         } catch (_: Exception) {}
+        connectionQueue.clear()
+        isHandshakeActive = false
+        activeHandshakeEndpoint = null
+        isRadioCooldownActive = false
         connectedEndpoints.clear()
         connectingEndpoints.clear()
         discoveredEndpoints.clear()
@@ -169,13 +223,14 @@ class MeshForegroundService : Service() {
     }
 
     private fun triggerSos(type: EmergencyType, lat: Double, lng: Double) {
+        val (finalLat, finalLng) = if (lat == 0.0 && lng == 0.0) getFallbackLocation() else Pair(lat, lng)
         val battery = getBatteryPercentage()
         val priority = SosPriorityCalculator.calculate(type, battery)
         val sos = SosPacket(
             senderId = localDeviceName, batteryLevel = battery,
             priority = priority.label, emergencyType = type.name,
             severity = if (priority == SosPriority.MEDIUM) "MEDIUM" else "CRITICAL",
-            latitude = lat, longitude = lng, ttl = 5, hopCount = 0,
+            latitude = finalLat, longitude = finalLng, ttl = 5, hopCount = 0,
             relayPath = listOf(localDeviceName),
             messageText = when (type) {
                 EmergencyType.LOST_ASSISTANCE -> "ASSISTANCE NEEDED: User is lost / needs rescue."
@@ -185,7 +240,7 @@ class MeshForegroundService : Service() {
         meshRouter.registerLocalSos(sos)
         priorityQueue.enqueue(sos)
         MeshRepository.updateRelayQueue(priorityQueue.getAll())
-        MeshRepository.addLog("🚨 SOS ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
+        MeshRepository.addLog("🚨 SOS ${sos.messageId} | Location: $finalLat, $finalLng | Battery: $battery%")
 
         if (MeshRepository.isGatewayModeEnabled.value && GatewayUploader.hasInternetConnection(this)) {
             sos.gatewayId = localDeviceName
@@ -198,6 +253,7 @@ class MeshForegroundService : Service() {
     }
 
     private fun triggerEmergencyMessage(text: String, lat: Double, lng: Double) {
+        val (finalLat, finalLng) = if (lat == 0.0 && lng == 0.0) getFallbackLocation() else Pair(lat, lng)
         val battery = getBatteryPercentage()
         val priority = SosPriority.HIGH
         val sos = SosPacket(
@@ -206,8 +262,8 @@ class MeshForegroundService : Service() {
             priority = priority.label,
             emergencyType = EmergencyType.EMERGENCY.name,
             severity = "CRITICAL",
-            latitude = lat,
-            longitude = lng,
+            latitude = finalLat,
+            longitude = finalLng,
             ttl = 5,
             hopCount = 0,
             relayPath = listOf(localDeviceName),
@@ -217,7 +273,7 @@ class MeshForegroundService : Service() {
         meshRouter.registerLocalSos(sos)
         priorityQueue.enqueue(sos)
         MeshRepository.updateRelayQueue(priorityQueue.getAll())
-        MeshRepository.addLog("💬 MSG ${sos.messageId} | Priority: ${priority.label} | Battery: $battery%")
+        MeshRepository.addLog("💬 MSG ${sos.messageId} | Location: $finalLat, $finalLng | Text: $text")
 
         if (MeshRepository.isGatewayModeEnabled.value && GatewayUploader.hasInternetConnection(this)) {
             sos.gatewayId = localDeviceName
@@ -242,20 +298,52 @@ class MeshForegroundService : Service() {
         updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
     }
 
-    // ── Safe Connection Request Helper ──────────────────────────────────
-    private fun connectToEndpoint(endpointId: String) {
-        if (connectedEndpoints.containsKey(endpointId) || connectingEndpoints.contains(endpointId)) {
+    // ── Serialized Connection Handshake Queue ───────────────────────────
+    @Synchronized
+    private fun enqueueConnection(endpointId: String) {
+        if (connectedEndpoints.containsKey(endpointId) ||
+            connectedEndpoints.size >= MAX_ACTIVE_PEERS ||
+            connectionQueue.contains(endpointId) ||
+            activeHandshakeEndpoint == endpointId) {
             return
         }
-        connectingEndpoints.add(endpointId)
+        connectionQueue.add(endpointId)
+        processNextConnection()
+    }
+
+    @Synchronized
+    private fun processNextConnection() {
+        if (isHandshakeActive || isRadioCooldownActive) return
+        if (connectedEndpoints.size >= MAX_ACTIVE_PEERS) {
+            connectionQueue.clear()
+            return
+        }
+        val nextId = connectionQueue.pollFirst() ?: return
+        if (connectedEndpoints.containsKey(nextId)) {
+            processNextConnection()
+            return
+        }
+
+        isHandshakeActive = true
+        activeHandshakeEndpoint = nextId
+        connectingEndpoints.add(nextId)
         MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
-        val peerName = discoveredEndpoints[endpointId] ?: endpointId
-        MeshRepository.addLog("🤝 Requesting connection to $peerName...")
-        connectionsClient.requestConnection(localDeviceName, endpointId, connectionLifecycleCallback)
+
+        val peerName = discoveredEndpoints[nextId] ?: nextId
+        MeshRepository.addLog("🤝 [Queue] Initiating handshake with $peerName...")
+
+        handler.removeCallbacks(handshakeTimeoutRunnable)
+        handler.postDelayed(handshakeTimeoutRunnable, HANDSHAKE_TIMEOUT_MS)
+
+        connectionsClient.requestConnection(localDeviceName, nextId, connectionLifecycleCallback)
             .addOnFailureListener { e ->
-                connectingEndpoints.remove(endpointId)
+                handler.removeCallbacks(handshakeTimeoutRunnable)
+                connectingEndpoints.remove(nextId)
                 MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
-                MeshRepository.addLog("⚠️ Connection request to $peerName failed: ${e.message}")
+                isHandshakeActive = false
+                activeHandshakeEndpoint = null
+                MeshRepository.addLog("⚠️ Request to $peerName failed: ${e.message}")
+                handler.postDelayed({ processNextConnection() }, 500L)
             }
     }
 
@@ -296,17 +384,21 @@ class MeshForegroundService : Service() {
             discoveredEndpoints[endpointId] = info.endpointName
             connectingEndpoints.add(endpointId)
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
-            MeshRepository.addLog("🤝 Handshake initiated with ${info.endpointName}")
-            // Always accept the connection
+            MeshRepository.addLog("🤝 Incoming handshake from ${info.endpointName}")
             connectionsClient.acceptConnection(endpointId, payloadCallback)
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
+            handler.removeCallbacks(handshakeTimeoutRunnable)
+            isHandshakeActive = false
+            activeHandshakeEndpoint = null
             connectingEndpoints.remove(endpointId)
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
+
             val statusCode = result.status.statusCode
             val isSuccess = result.status.isSuccess ||
-                            statusCode == ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT
+                            statusCode == ConnectionsStatusCodes.STATUS_ALREADY_CONNECTED_TO_ENDPOINT ||
+                            statusCode == 8011 // STATUS_ALREADY_HAVE_ACTIVE_BIDIRECTIONAL_CONNECTION
 
             if (isSuccess) {
                 val name = discoveredEndpoints[endpointId] ?: "Device-${endpointId.take(4).uppercase()}"
@@ -317,35 +409,35 @@ class MeshForegroundService : Service() {
             } else {
                 val name = discoveredEndpoints[endpointId] ?: endpointId
                 MeshRepository.addLog("❌ Connection with $name failed ($statusCode)")
-                // Staggered retry: initiator retries in 4s, receiver in 8s
-                val isInitiator = localDeviceName < name
-                val retryDelay = if (isInitiator) 4000L else 8000L
-                handler.postDelayed({
-                    if (discoveredEndpoints.containsKey(endpointId) &&
-                        !connectedEndpoints.containsKey(endpointId)) {
-                        connectToEndpoint(endpointId)
-                    }
-                }, retryDelay)
+
+                if (statusCode == 8008) { // STATUS_RADIO_ERROR
+                    MeshRepository.addLog("📻 Radio busy — cooling down for 6s...")
+                    isRadioCooldownActive = true
+                    handler.postDelayed({
+                        isRadioCooldownActive = false
+                        processNextConnection()
+                    }, 6000L)
+                }
+
+                // Remove stale endpoint from discovered list if rejected
+                discoveredEndpoints.remove(endpointId)
             }
+
+            // Process next peer in queue after small delay
+            handler.postDelayed({ processNextConnection() }, 1000L)
         }
 
         override fun onDisconnected(endpointId: String) {
             val name = connectedEndpoints.remove(endpointId) ?: discoveredEndpoints[endpointId] ?: endpointId
             connectingEndpoints.remove(endpointId)
+            // Invalidate stale endpointId so it is not redialed with invalid session ID
+            discoveredEndpoints.remove(endpointId)
+            connectionQueue.remove(endpointId)
+
             MeshRepository.updateConnectedEndpoints(connectedEndpoints.toMap())
             MeshRepository.updateConnectingEndpoints(connectingEndpoints.toSet())
             MeshRepository.addLog("🔌 $name disconnected. Active Peers: ${connectedEndpoints.size}")
             updateNotification("Active Peers: ${connectedEndpoints.size} | Relayed: $totalRelayedCount")
-
-            // Auto-reconnect after 4s (initiator) or 8s (receiver)
-            val isInitiator = localDeviceName < name
-            val retryDelay = if (isInitiator) 4000L else 8000L
-            handler.postDelayed({
-                if (discoveredEndpoints.containsKey(endpointId) &&
-                    !connectedEndpoints.containsKey(endpointId)) {
-                    connectToEndpoint(endpointId)
-                }
-            }, retryDelay)
         }
     }
 
@@ -354,36 +446,41 @@ class MeshForegroundService : Service() {
             if (info.serviceId != SERVICE_ID) return
             discoveredEndpoints[endpointId] = info.endpointName
 
-            if (connectedEndpoints.containsKey(endpointId) || connectingEndpoints.contains(endpointId)) {
+            if (connectedEndpoints.containsKey(endpointId) ||
+                connectingEndpoints.contains(endpointId) ||
+                connectedEndpoints.size >= MAX_ACTIVE_PEERS) {
                 return
             }
 
             val shouldInitiate = localDeviceName < info.endpointName
             if (shouldInitiate) {
-                // Initiator connects immediately
-                MeshRepository.addLog("📡 Discovered ${info.endpointName} — Initiating connection...")
-                connectToEndpoint(endpointId)
+                MeshRepository.addLog("📡 Discovered ${info.endpointName} — Queuing handshake (Initiator)...")
+                enqueueConnection(endpointId)
             } else {
-                // Follower waits for incoming handshake, with a fallback timer
-                MeshRepository.addLog("👀 Discovered ${info.endpointName} — Waiting for peer handshake...")
+                val jitter = (0..3000).random().toLong()
+                val fallbackDelay = FALLBACK_INITIATE_DELAY_MS + jitter
+                MeshRepository.addLog("👀 Discovered ${info.endpointName} — Waiting for peer (${fallbackDelay / 1000}s fallback)...")
                 handler.postDelayed({
                     if (!connectedEndpoints.containsKey(endpointId) &&
                         !connectingEndpoints.contains(endpointId) &&
-                        discoveredEndpoints.containsKey(endpointId)) {
-                        MeshRepository.addLog("⏱️ Fallback: Initiating connection to ${info.endpointName}...")
-                        connectToEndpoint(endpointId)
+                        discoveredEndpoints.containsKey(endpointId) &&
+                        connectedEndpoints.size < MAX_ACTIVE_PEERS) {
+                        MeshRepository.addLog("⏱️ Fallback timer: Queuing connection to ${info.endpointName}...")
+                        enqueueConnection(endpointId)
                     }
-                }, FALLBACK_INITIATE_DELAY_MS)
+                }, fallbackDelay)
             }
         }
 
         override fun onEndpointLost(endpointId: String) {
             val name = discoveredEndpoints[endpointId] ?: endpointId
+            discoveredEndpoints.remove(endpointId)
+            connectionQueue.remove(endpointId)
             MeshRepository.addLog("📡 Peer $name lost from discovery range")
         }
     }
 
-    // ── Notification & WakeLock ─────────────────────────────────────────
+    // ── Notification, WakeLock & WifiLock ───────────────────────────────
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
@@ -432,6 +529,19 @@ class MeshForegroundService : Service() {
     private fun releaseWakeLock() {
         try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (_: Exception) {}
         wakeLock = null
+    }
+
+    private fun acquireWifiLock() {
+        if (wifiLock == null) {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            wifiLock = wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ResQMesh:WifiLock")
+            wifiLock?.acquire()
+        }
+    }
+
+    private fun releaseWifiLock() {
+        try { if (wifiLock?.isHeld == true) wifiLock?.release() } catch (_: Exception) {}
+        wifiLock = null
     }
 
     private fun getBatteryPercentage() = try {
