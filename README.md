@@ -1,7 +1,7 @@
 # 🛡️ ResQMesh — Offline Mesh SOS Emergency Relay
 
-> **Track 6: Disaster Management & Public Safety**  
-> **Problem 6.1: Offline Mesh SOS Relay for Signal-Dead Zones**
+> **Track : Disaster Management & Public Safety**  
+> **Problem : Offline Mesh SOS Relay for Signal-Dead Zones**
 > 
 > 🌐 **Live Cloud Gateway**: https://jeangrey.onrender.com
 
