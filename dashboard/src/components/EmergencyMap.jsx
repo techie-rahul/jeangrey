@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -37,12 +37,48 @@ function AutoCenterMap({ alerts, selectedAlert }) {
 
 export default function EmergencyMap({ alerts, selectedAlert, onSelectAlert }) {
   const defaultCenter = [26.9124, 75.7873]; // Default: Jaipur coordinates
+  const [mapMode, setMapMode] = useState('dark'); // 'dark' | 'satellite' | 'street'
 
   return (
     <div className="w-full h-full min-h-[420px] rounded-xl overflow-hidden border border-slate-800 relative shadow-2xl">
-      <div className="absolute top-3 right-3 z-[1000] bg-dark-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-mono flex items-center gap-2 text-slate-300 shadow">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>SATELLITE & MESH OVERLAY ACTIVE</span>
+      {/* Map Mode Selector */}
+      <div className="absolute top-3 right-3 z-[1000] bg-dark-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-700 text-xs font-mono flex items-center gap-1 shadow-lg">
+        <button
+          type="button"
+          onClick={() => setMapMode('dark')}
+          className={`px-2.5 py-1 rounded transition text-xs flex items-center gap-1.5 ${
+            mapMode === 'dark'
+              ? 'bg-red-600 text-white font-semibold shadow'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+          Dark
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapMode('satellite')}
+          className={`px-2.5 py-1 rounded transition text-xs flex items-center gap-1.5 ${
+            mapMode === 'satellite'
+              ? 'bg-red-600 text-white font-semibold shadow'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          Satellite
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapMode('street')}
+          className={`px-2.5 py-1 rounded transition text-xs flex items-center gap-1.5 ${
+            mapMode === 'street'
+              ? 'bg-red-600 text-white font-semibold shadow'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+          Street
+        </button>
       </div>
 
       <MapContainer
@@ -51,10 +87,40 @@ export default function EmergencyMap({ alerts, selectedAlert, onSelectAlert }) {
         scrollWheelZoom={true}
         className="w-full h-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
+        {mapMode === 'dark' && (
+          <>
+            <TileLayer
+              key="esri-dark-base"
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={16}
+            />
+            <TileLayer
+              key="esri-dark-ref"
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={16}
+            />
+          </>
+        )}
+
+        {mapMode === 'satellite' && (
+          <TileLayer
+            key="esri-sat"
+            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        )}
+
+        {mapMode === 'street' && (
+          <TileLayer
+            key="osm-street"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={19}
+          />
+        )}
 
         <AutoCenterMap alerts={alerts} selectedAlert={selectedAlert} />
 
