@@ -5,7 +5,10 @@ import EmergencyMap from './components/EmergencyMap';
 import AlertCard from './components/AlertCard';
 import StatsBar from './components/StatsBar';
 
-const SERVER_URL = 'https://jeangrey.onrender.com';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 
+  (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://jeangrey.onrender.com');
 
 export default function App() {
   const [alerts, setAlerts] = useState([]);
